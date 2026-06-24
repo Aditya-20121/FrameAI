@@ -1,0 +1,54 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+env/
+.env
+!.env.example
+
+# Scraper outputs (data, not code)
+scraper/output/raw/
+scraper/output/processed/
+scraper/output/images/
+scraper/annotation/annotations.csv
+scraper/annotation/to_annotate.csv
+
+# ML model cache
+.cache/
+*.pt
+*.pth
+*.onnx
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Node (for future frontend)
+node_modules/
+.next/
+.vercel/
+
+# Test artifacts
+.pytest_cache/
+htmlcov/
+.coverage

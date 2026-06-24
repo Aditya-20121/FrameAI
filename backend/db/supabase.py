@@ -1,0 +1,200 @@
+"""
+Supabase client wrapper — all DB operations go through these functions.
+Uses the service role key so calls are not subject to row-level security.
+"""
+import secrets
+from uuid import UUID
+from datetime import datetime, timezone, timedelta
+
+from supabase import create_client, Client
+from config import settings
+
+
+def _client() -> Client:
+    return create_client(settings.supabase_url, settings.supabase_service_key)
+
+
+# ── Sessions ──────────────────────────────────────────────────────────────────
+
+def create_session() -> str:
+    """Create a new anonymous session, return the token."""
+    token = secrets.token_urlsafe(32)
+    _client().table("sessions").insert({
+        "token": token,
+        "generations_used": 0,
+    }).execute()
+    return token
+
+
+def get_session(token: str) -> dict | None:
+    result = (
+        _client()
+        .table("sessions")
+        .select("*")
+        .eq("token", token)
+        .single()
+        .execute()
+    )
+    return result.data
+
+
+def touch_session(token: str) -> None:
+    _client().table("sessions").update({
+        "last_active_at": datetime.now(timezone.utc).isoformat(),
+    }).eq("token", token).execute()
+
+
+def increment_generations(token: str) -> int:
+    """Atomically increment generations_used. Returns new value."""
+    result = _client().rpc(
+        "increment_generations",
+        {"session_token": token},
+    ).execute()
+    return result.data
+
+
+# ── Jobs ──────────────────────────────────────────────────────────────────────
+
+def create_job(session_token: str, photo_r2_key: str) -> str:
+    """Create a job record, return job_id as string."""
+    expires_at = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
+    result = (
+        _client()
+        .table("jobs")
+        .insert({
+            "session_token": session_token,
+            "photo_r2_key": photo_r2_key,
+            "status": "processing",
+            "expires_at": expires_at,
+        })
+        .execute()
+    )
+    return result.data[0]["job_id"]
+
+
+def update_job_analysis(
+    job_id: str,
+    *,
+    face_shape: str,
+    face_shape_conf: float,
+    undertone: str,
+    undertone_conf: float,
+    undertone_hex: str,
+    ipd_mm: float,
+    size_band: str,
+) -> None:
+    _client().table("jobs").update({
+        "face_shape": face_shape,
+        "face_shape_conf": face_shape_conf,
+        "undertone": undertone,
+        "undertone_conf": undertone_conf,
+        "undertone_hex": undertone_hex,
+        "ipd_mm": ipd_mm,
+        "size_band": size_band,
+        "status": "complete",
+    }).eq("job_id", job_id).execute()
+
+
+def fail_job(job_id: str, reason: str = "analysis_failed") -> None:
+    _client().table("jobs").update({
+        "status": reason,
+    }).eq("job_id", job_id).execute()
+
+
+def get_job(job_id: str) -> dict | None:
+    result = (
+        _client()
+        .table("jobs")
+        .select("*")
+        .eq("job_id", job_id)
+        .single()
+        .execute()
+    )
+    return result.data
+
+
+# ── Generation tasks ───────────────────────────────────────────────────────────
+
+def create_generation_task(
+    job_id: str,
+    frame_id: str,
+    session_token: str,
+) -> str:
+    expires_at = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
+    result = (
+        _client()
+        .table("generation_tasks")
+        .insert({
+            "job_id": job_id,
+            "frame_id": frame_id,
+            "session_token": session_token,
+            "status": "queued",
+            "expires_at": expires_at,
+        })
+        .execute()
+    )
+    return result.data[0]["task_id"]
+
+
+def update_generation_task(
+    task_id: str,
+    *,
+    status: str,
+    image_r2_key: str | None = None,
+    fal_request_id: str | None = None,
+) -> None:
+    payload: dict = {"status": status}
+    if image_r2_key:
+        payload["image_r2_key"] = image_r2_key
+    if fal_request_id:
+        payload["fal_request_id"] = fal_request_id
+    if status == "complete":
+        payload["completed_at"] = datetime.now(timezone.utc).isoformat()
+    _client().table("generation_tasks").update(payload).eq("task_id", task_id).execute()
+
+
+def get_generation_task(task_id: str) -> dict | None:
+    result = (
+        _client()
+        .table("generation_tasks")
+        .select("*")
+        .eq("task_id", task_id)
+        .single()
+        .execute()
+    )
+    return result.data
+
+
+# ── Frames ────────────────────────────────────────────────────────────────────
+
+def get_frame(frame_id: str) -> dict | None:
+    result = (
+        _client()
+        .table("frames")
+        .select("*")
+        .eq("frame_id", frame_id)
+        .single()
+        .execute()
+    )
+    return result.data
+
+
+def query_frames(
+    best_styles: list[str],
+    best_colours: list[str],
+    boost_styles: list[str],
+    min_width: int,
+    max_width: int,
+    limit: int = 15,
+) -> list[dict]:
+    result = (
+        _client()
+        .table("frames")
+        .select("*")
+        .in_("style", best_styles)
+        .in_("colour", best_colours)
+        .not_.is_("product_image_url", "null")
+        .limit(limit)
+        .execute()
+    )
+    return result.data or []
