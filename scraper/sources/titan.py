@@ -58,15 +58,13 @@ class TitanScraper(BaseScraper):
     # ── Listing scraper ───────────────────────────────────────────────────────
 
     async def _scrape_listings(self) -> list[dict]:
+        """Try REST API first; auto-fall back to Playwright if it returns nothing."""
         all_products: list[dict] = []
         async with httpx.AsyncClient(follow_redirects=True) as client:
             page = 1
             while True:
-                params = {
-                    "category": "eyeglasses",
-                    "page": page,
-                    "limit": SOURCE["page_size"],
-                }
+                # Category is in the URL path; paginate with page + limit
+                params = {"page": page, "limit": SOURCE["page_size"]}
                 data = await self.get_json(client, SOURCE["listing_api"], params)
                 if not data:
                     break
@@ -75,7 +73,8 @@ class TitanScraper(BaseScraper):
                     data.get("products")
                     or data.get("data", {}).get("products")
                     or data.get("items")
-                    or []
+                    or data.get("result", {}).get("products")
+                    or (data if isinstance(data, list) else [])
                 )
                 if not products:
                     break
@@ -86,8 +85,77 @@ class TitanScraper(BaseScraper):
                         all_products.append(record)
 
                 log.info("Titan page %d: +%d products (total %d)", page, len(products), len(all_products))
+                if len(products) < SOURCE["page_size"]:
+                    break
                 page += 1
 
+        if not all_products:
+            log.info("Titan REST API returned nothing — falling back to Playwright listing")
+            all_products = await self._scrape_listings_playwright()
+
+        return all_products
+
+    async def _scrape_listings_playwright(self) -> list[dict]:
+        """Scrape Titan listing page via Playwright: intercepts XHR and reads __NEXT_DATA__."""
+        captured: list[dict] = []
+        listing_url = f"{SOURCE['product_base_url']}/eyeglasses"
+
+        async with async_playwright() as pw:
+            browser = await pw.chromium.launch(headless=True)
+            context = await browser.new_context(extra_http_headers=BROWSER_HEADERS)
+            page = await context.new_page()
+
+            async def _on_response(response):
+                content_type = response.headers.get("content-type", "")
+                if "json" not in content_type:
+                    return
+                try:
+                    body = await response.json()
+                    products = (
+                        body.get("products")
+                        or body.get("data", {}).get("products")
+                        or body.get("items")
+                        or []
+                    )
+                    if products:
+                        captured.extend(products)
+                        log.info("Titan intercepted %d products from %s", len(products), response.url)
+                except Exception:
+                    pass
+
+            page.on("response", _on_response)
+
+            try:
+                await page.goto(listing_url, wait_until="networkidle", timeout=PLAYWRIGHT_TIMEOUT_MS)
+
+                if not captured:
+                    # Next.js embeds server-side data in __NEXT_DATA__
+                    next_data = await page.evaluate("""
+                        () => {
+                            const el = document.getElementById('__NEXT_DATA__');
+                            return el ? JSON.parse(el.textContent) : null;
+                        }
+                    """)
+                    if next_data:
+                        props = next_data.get("props", {}).get("pageProps", {})
+                        for key in ("products", "items"):
+                            products = props.get(key) or props.get("data", {}).get(key, [])
+                            if products:
+                                captured.extend(products)
+                                break
+                        log.info("Titan __NEXT_DATA__: %d products", len(captured))
+            except Exception as exc:
+                log.warning("Titan Playwright listing failed: %s", exc)
+            finally:
+                await browser.close()
+
+        all_products: list[dict] = []
+        for p in captured:
+            record = self._extract_listing_fields(p)
+            if record:
+                all_products.append(record)
+
+        log.info("Titan Playwright listing: %d products extracted", len(all_products))
         return all_products
 
     def _extract_listing_fields(self, p: dict) -> dict | None:

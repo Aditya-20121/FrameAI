@@ -241,7 +241,9 @@ SOURCES = {
     },
     "titan": {
         "retailer": "Titan Eye+",
-        "listing_api": "https://www.titaneyeplus.com/api/products",
+        # Discovered via Playwright XHR intercept — /api/products returns 404
+        "listing_api": "https://www.titaneyeplus.com/api/products/get-list/eyeglasses",
+        "listing_url": "https://www.titaneyeplus.com/eyeglasses",
         "product_base_url": "https://www.titaneyeplus.com",
         "page_size": 24,
     },

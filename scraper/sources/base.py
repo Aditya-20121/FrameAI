@@ -104,11 +104,16 @@ class BaseScraper:
 
     @staticmethod
     def parse_price(raw: str | int | float | None) -> int | None:
-        """Parse "₹1,899", "Rs. 1899", "1899.00", 1899 → 1899."""
+        """Parse "₹1,899", "Rs. 1899", "1899.00", "1800.000000", 1899 → 1899."""
         import re
         if raw is None:
             return None
         if isinstance(raw, (int, float)):
             return int(raw)
+        # Try float conversion first so "1800.000000" → 1800 (not 1800000000)
+        try:
+            return int(float(str(raw).replace(",", "")))
+        except (ValueError, TypeError):
+            pass
         digits = re.sub(r"[^\d]", "", str(raw))
         return int(digits) if digits else None

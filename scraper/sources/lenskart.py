@@ -14,8 +14,9 @@ from pathlib import Path
 
 import httpx
 from bs4 import BeautifulSoup
+from playwright.async_api import async_playwright
 
-from config import SOURCES, STYLE_MAP, COLOUR_MAP, CHECKPOINT_EVERY, BROWSER_HEADERS
+from config import SOURCES, STYLE_MAP, COLOUR_MAP, CHECKPOINT_EVERY, BROWSER_HEADERS, PLAYWRIGHT_TIMEOUT_MS
 from sources.base import BaseScraper
 
 log = logging.getLogger(__name__)
@@ -62,6 +63,7 @@ class LenskartScraper(BaseScraper):
     # ── Listing scraper ───────────────────────────────────────────────────────
 
     async def _scrape_listings(self) -> list[dict]:
+        """Try JSON API first; fall back to HTML __NEXT_DATA__ if API redirects/fails."""
         all_products: list[dict] = []
         async with httpx.AsyncClient(follow_redirects=True) as client:
             for gender in GENDERS:
@@ -93,7 +95,170 @@ class LenskartScraper(BaseScraper):
                     log.info("Lenskart %s page %d: +%d products", gender, page, len(products))
                     page += 1
 
+        if not all_products:
+            log.info(
+                "Lenskart JSON API unavailable (403/redirect) — falling back to Playwright"
+            )
+            all_products = await self._scrape_listings_playwright()
+
         return all_products
+
+    async def _scrape_listings_playwright(self) -> list[dict]:
+        """
+        Scrape lenskart.com SSR listing pages via Playwright DOM evaluation.
+
+        Lenskart renders products server-side so XHR interception misses them.
+        We load the page, dismiss the cookie dialog, scroll to trigger infinite
+        scroll, and extract from the live DOM using page.evaluate().
+        """
+        import re as _re
+
+        # DOM extractor: finds product links by Lenskart's -cN- colour-variant URL pattern.
+        # Uses closest('li') to scope each card, then walks siblings for name/price.
+        _JS_EXTRACT = (
+            "() => {"
+            "  const results = [];"
+            "  const seen = new Set();"
+            "  const links = Array.from(document.querySelectorAll("
+            "    'a[href*=\"-c1-\"], a[href*=\"-c2-\"], a[href*=\"-c3-\"], a[href*=\"-c4-\"]'"
+            "  ));"
+            "  links.forEach(link => {"
+            "    const href = link.href;"
+            "    if (!href || !href.includes('lenskart.com')) return;"
+            "    if (seen.has(href)) return; seen.add(href);"
+            "    const card = link.closest('li') || link.closest('[class]') || link.parentElement;"
+            "    const cardText = card ? card.innerText : '';"
+            "    const img = card ? card.querySelector('img') : null;"
+            "    results.push({"
+            "      url: href,"
+            "      card_text: cardText.substring(0, 500),"
+            "      image_url: img ? img.src : null,"
+            "    });"
+            "  });"
+            "  return results;"
+            "}"
+        )
+
+        listing_pages = [
+            ("https://www.lenskart.com/men-eyeglasses.html", "men"),
+            ("https://www.lenskart.com/women-eyeglasses.html", "women"),
+        ]
+        _MAX_SCROLLS = 8  # each scroll loads ~12 more products
+        captured: list[dict] = []
+
+        async with async_playwright() as pw:
+            browser = await pw.chromium.launch(headless=True)
+            context = await browser.new_context(extra_http_headers=BROWSER_HEADERS)
+
+            for page_url, gender in listing_pages:
+                page = await context.new_page()
+                try:
+                    await page.goto(
+                        page_url, wait_until="domcontentloaded", timeout=PLAYWRIGHT_TIMEOUT_MS
+                    )
+                    # Dismiss cookie / privacy dialog
+                    try:
+                        await page.click("button:has-text('Allow all')", timeout=4000)
+                    except Exception:
+                        pass
+                    await asyncio.sleep(3)
+
+                    # Scroll to trigger infinite scroll pagination
+                    seen_count = 0
+                    for _ in range(_MAX_SCROLLS):
+                        await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                        await asyncio.sleep(2)
+                        raw = await page.evaluate(_JS_EXTRACT)
+                        if len(raw) == seen_count:
+                            break  # no new products loaded
+                        seen_count = len(raw)
+
+                    raw_items = await page.evaluate(_JS_EXTRACT)
+                    log.info("Lenskart Playwright %s: %d raw DOM items", gender, len(raw_items))
+
+                    for item in raw_items:
+                        record = self._extract_dom_record(item, gender)
+                        if record:
+                            captured.append(record)
+
+                except Exception as exc:
+                    log.warning("Lenskart Playwright %s failed: %s", gender, exc)
+                finally:
+                    await page.close()
+
+            await browser.close()
+
+        log.info("Lenskart Playwright fallback: %d products", len(captured))
+        return captured
+
+    def _extract_dom_record(self, item: dict, gender: str) -> dict | None:
+        """Parse a DOM-extracted product dict into a normalised record."""
+        import re as _re
+        try:
+            url = item.get("url", "")
+            if not url:
+                return None
+
+            card_text: str = item.get("card_text", "")
+            lines = [l.strip() for l in card_text.split("\n") if l.strip()]
+
+            # Name: line immediately after a "+ N" colour-count line (e.g. "+ 4")
+            name = ""
+            for i, line in enumerate(lines):
+                if _re.match(r"^\+\s*\d+$", line) and i + 1 < len(lines):
+                    name = lines[i + 1]
+                    break
+            if not name:
+                # Fall back to slug
+                slug = url.split("/")[-1]
+                name = _re.sub(r"-c\d+-eyeglasses.*", "", slug).replace("-", " ")
+
+            # Price: first 3-5 digit number in reasonable range
+            price = None
+            for line in lines:
+                m = _re.search(r"(\d{3,5})", line)
+                if m and 300 <= int(m.group(1)) <= 30000:
+                    price = int(m.group(1))
+                    break
+
+            # Source ID from URL slug
+            slug = url.split("/")[-1]
+            source_id = slug.replace("-eyeglasses.html", "").replace(".html", "")
+
+            # Style / colour from name keywords
+            raw_style = ""
+            for kw in STYLE_MAP:
+                if kw in name.lower():
+                    raw_style = kw
+                    break
+            raw_colour = ""
+            for kw in COLOUR_MAP:
+                if kw in name.lower():
+                    raw_colour = kw
+                    break
+
+            return {
+                "source": self.source_key,
+                "source_id": source_id,
+                "name": name,
+                "product_url": url,
+                "image_url": item.get("image_url"),
+                "raw_style": raw_style,
+                "style": STYLE_MAP.get(raw_style) if raw_style else None,
+                "raw_colour": raw_colour,
+                "colour": COLOUR_MAP.get(raw_colour) if raw_colour else None,
+                "price_inr": price,
+                "gender_tag": gender,
+                "retailer": self.retailer,
+                "buy_url": url,
+                "lens_width_mm": None,
+                "bridge_width_mm": None,
+                "temple_length_mm": None,
+                "material": None,
+            }
+        except Exception as exc:
+            log.debug("DOM record extract failed: %s", exc)
+            return None
 
     def _extract_listing_fields(self, p: dict, gender: str) -> dict | None:
         try:

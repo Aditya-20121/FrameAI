@@ -21,10 +21,8 @@ class JohnJacobsScraper(LenskartScraper):
 
     def __init__(self, raw_dir: Path):
         super().__init__(raw_dir)
-        # Override source URLs to use JJ's domain
-        import config as cfg
-        cfg.SOURCES["lenskart"]["listing_api"] = SOURCE["listing_api"]
-        cfg.SOURCES["lenskart"]["product_base_url"] = SOURCE["product_base_url"]
+        # Do NOT mutate global SOURCES["lenskart"] — that shared dict is also used by
+        # LenskartScraper. scrape_all() below uses SOURCE (SOURCES["johnjacobs"]) directly.
 
     async def scrape_all(self) -> list[dict]:
         # Use parent's scrape logic but checkpoint under johnjacobs prefix

@@ -7,12 +7,14 @@ their ToS. ~200–300 eyeglass SKUs.
 
 Per DATA_PIPELINE.md: "Scrape only the public product listing."
 """
+import asyncio
 import logging
 from pathlib import Path
 
 import httpx
+from playwright.async_api import async_playwright
 
-from config import SOURCES, STYLE_MAP, COLOUR_MAP
+from config import SOURCES, STYLE_MAP, COLOUR_MAP, BROWSER_HEADERS, PLAYWRIGHT_TIMEOUT_MS
 from sources.base import BaseScraper
 
 log = logging.getLogger(__name__)
@@ -31,7 +33,7 @@ class RayBanScraper(BaseScraper):
         listings = self.load_checkpoint("rayban_listings")
         if not listings:
             listings = await self._scrape_listings()
-            self.save_checkpoint("rayban_listings", listings)
+            self.save_checkpoint(listings, "rayban_listings")
 
         log.info("Ray-Ban listings: %d products", len(listings))
         # No detail scraping for Ray-Ban
@@ -52,7 +54,6 @@ class RayBanScraper(BaseScraper):
                 if not data:
                     break
 
-                # Commerce Cloud returns hits array
                 hits = (
                     data.get("hits")
                     or data.get("products")
@@ -73,6 +74,76 @@ class RayBanScraper(BaseScraper):
                 if start >= (total or len(all_products)):
                     break
 
+        if not all_products:
+            log.info("Ray-Ban API returned nothing (likely 403) — falling back to Playwright")
+            all_products = await self._scrape_listings_playwright()
+
+        return all_products
+
+    async def _scrape_listings_playwright(self) -> list[dict]:
+        """
+        Scrape Ray-Ban India eyeglasses listing via Playwright.
+
+        Ray-Ban uses Salesforce Commerce Cloud with XHR product loading.
+        We intercept XHR responses containing product hits.
+        Listing URL: https://www.ray-ban.com/en_IN/c/eyeglasses
+        """
+        _LISTING_URL = "https://www.ray-ban.com/en_IN/c/eyeglasses"
+        _MAX_SCROLLS = 10
+        captured_hits: list[dict] = []
+
+        async with async_playwright() as pw:
+            browser = await pw.chromium.launch(headless=True)
+            context = await browser.new_context(extra_http_headers=BROWSER_HEADERS)
+            page = await context.new_page()
+
+            async def _on_response(resp):
+                if resp.status != 200:
+                    return
+                ct = resp.headers.get("content-type", "")
+                if "json" not in ct:
+                    return
+                try:
+                    body = await resp.json()
+                    hits = (
+                        body.get("hits")
+                        or body.get("productSearchResult", {}).get("hits")
+                        or body.get("products")
+                        or []
+                    )
+                    if hits:
+                        captured_hits.extend(hits)
+                        log.info("Ray-Ban intercepted %d hits from %s", len(hits), resp.url[:80])
+                except Exception:
+                    pass
+
+            page.on("response", _on_response)
+
+            try:
+                await page.goto(_LISTING_URL, wait_until="domcontentloaded", timeout=PLAYWRIGHT_TIMEOUT_MS)
+                await asyncio.sleep(3)
+
+                prev_count = 0
+                for _ in range(_MAX_SCROLLS):
+                    await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+                    await asyncio.sleep(2)
+                    if len(captured_hits) == prev_count:
+                        break
+                    prev_count = len(captured_hits)
+
+                log.info("Ray-Ban Playwright: %d raw hits intercepted", len(captured_hits))
+            except Exception as exc:
+                log.warning("Ray-Ban Playwright listing failed: %s", exc)
+            finally:
+                await browser.close()
+
+        all_products = []
+        for p in captured_hits:
+            record = self._extract_fields(p)
+            if record:
+                all_products.append(record)
+
+        log.info("Ray-Ban Playwright: %d products extracted", len(all_products))
         return all_products
 
     def _extract_fields(self, p: dict) -> dict | None:
