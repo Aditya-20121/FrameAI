@@ -4,7 +4,7 @@ Session token lives in an HttpOnly cookie named `_frameai_session`.
 """
 from fastapi import Cookie, Response
 
-from db import supabase as db
+from db import client as db
 
 COOKIE_NAME = "_frameai_session"
 COOKIE_MAX_AGE = 365 * 24 * 3600  # 1 year

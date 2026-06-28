@@ -17,7 +17,7 @@ from models.schemas import (
     GenerateLimitError,
     GenerationStatus,
 )
-from db import supabase as db
+from db import client as db
 from services import generation as gen_svc, storage
 
 router = APIRouter()

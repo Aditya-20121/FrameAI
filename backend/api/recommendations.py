@@ -15,7 +15,7 @@ from services.recommender import (
     IPD_SIZE_RULES,
     get_size_band,
 )
-from db import supabase as db
+from db import client as db
 
 router = APIRouter()
 

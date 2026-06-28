@@ -252,8 +252,10 @@ def _score_round(g: FaceGeometry) -> float:
         s += 30
     if 0.85 <= g.jaw_ratio <= 1.02:
         s += 30
-    if g.aspect_ratio < 1.30:
+    if g.aspect_ratio < 1.22:
         s += 40
+    elif g.aspect_ratio < 1.30:
+        s += 15  # borderline — not short enough to be definitively round
     return s
 
 

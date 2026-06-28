@@ -72,6 +72,10 @@ def create_job(session_token: str, photo_r2_key: str) -> str:
     return result.data[0]["job_id"]
 
 
+def update_job_r2_key(job_id: str, r2_key: str) -> None:
+    _client().table("jobs").update({"photo_r2_key": r2_key}).eq("job_id", job_id).execute()
+
+
 def update_job_analysis(
     job_id: str,
     *,

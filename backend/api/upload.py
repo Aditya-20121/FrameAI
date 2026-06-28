@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile, Fil
 from api.session import get_or_create_session
 from models.schemas import UploadResponse
 from services import face_analysis, undertone, storage
-from db import supabase as db
+from db import client as db
 
 router = APIRouter()
 
@@ -67,7 +67,7 @@ async def upload_photo(
     job_id = db.create_job(session_token, photo_r2_key="pending")
     r2_key = storage.upload_photo(job_id, image_bytes, photo.content_type or "image/jpeg")
     # Update key now that we have it (job was pre-created for the UUID)
-    db._client().table("jobs").update({"photo_r2_key": r2_key}).eq("job_id", job_id).execute()
+    db.update_job_r2_key(job_id, r2_key)
 
     # ── Run analysis pipeline (sync, ~2s on CPU) ───────────────────────────────
     try:

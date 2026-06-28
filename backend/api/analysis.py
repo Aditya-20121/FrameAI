@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from api.session import require_session
 from models.schemas import AnalysisResult, SessionStatus
-from db import supabase as db
+from db import client as db
 
 router = APIRouter()
 

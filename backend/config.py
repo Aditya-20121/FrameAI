@@ -16,7 +16,12 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379"
     session_secret: str
 
-    allowed_origins: list[str] = ["http://localhost:3000"]
+    # Stored as comma-separated string so pydantic-settings doesn't JSON-parse it.
+    # Use get_allowed_origins() for the parsed list.
+    allowed_origins: str = "http://localhost:3000"
+
+    def get_allowed_origins(self) -> list[str]:
+        return [o.strip() for o in self.allowed_origins.split(",") if o.strip()]
 
     class Config:
         env_file = ".env"
