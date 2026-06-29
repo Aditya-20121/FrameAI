@@ -53,7 +53,7 @@ def _print(msg: str, style: str = "") -> None:
 
 
 def open_image(path: str) -> None:
-    """Open image in OS default viewer."""
+    """Open image file in OS default viewer."""
     system = platform.system()
     try:
         if system == "Windows":
@@ -64,6 +64,15 @@ def open_image(path: str) -> None:
             subprocess.Popen(["xdg-open", path])
     except Exception:
         _print(f"  [Could not auto-open image: {path}]")
+
+
+def open_url(url: str) -> None:
+    """Open URL in the default browser."""
+    import webbrowser
+    try:
+        webbrowser.open(url)
+    except Exception:
+        _print(f"  [Could not open browser: {url}]")
 
 
 def load_catalogue() -> list[dict]:
@@ -156,19 +165,35 @@ def annotate_record(record: dict) -> dict | None:
     _print(f"  Retailer: {retailer}  |  Price: ₹{price or '?'}")
     _print(f"  ID: {frame_id}")
 
-    # Open image
+    # Open image (local file or product URL as fallback)
     img_path = str(IMAGES_NORM_DIR / f"{record.get('source_id', frame_id)}.webp")
+    product_url = record.get("buy_url") or record.get("product_url") or ""
+    image_url = record.get("product_image_url") or ""
+
     if Path(img_path).exists():
-        _print(f"  [dim]Opening image: {img_path}[/dim]")
+        _print(f"  [dim]Opening local image…[/dim]")
         open_image(img_path)
+    elif image_url:
+        _print(f"  [dim]Opening product image in browser → {image_url[:80]}[/dim]")
+        open_url(image_url)
+    elif product_url:
+        _print(f"  [dim]Opening product page in browser → {product_url[:80]}[/dim]")
+        open_url(product_url)
     else:
-        _print(f"  [dim]Image not found: {img_path}[/dim]")
+        _print("  [yellow]No image or URL available — skip recommended[/yellow]")
+
+    _print("")
+    _print("  [dim]What to fill in:[/dim]")
+    _print("  [dim]  face_shape_tags — face shapes this frame SUITS (oval/round/square/heart/diamond/oblong)[/dim]")
+    _print("  [dim]  undertone_tags  — frame colour tone (warm=gold/brown/tort, cool=silver/grey/blue, neutral=both)[/dim]")
+    _print("  [dim]  vibe_tags       — style personality of the frame[/dim]")
+    _print("")
 
     # Skip option
     if HAS_RICH:
-        skip = Confirm.ask("  Skip this frame?", default=False)
+        skip = Confirm.ask("  Skip this frame? (n = annotate it)", default=False)
     else:
-        skip = input("  Skip? [y/N]: ").strip().lower() == "y"
+        skip = input("  Skip this frame? y=skip for now, n=annotate it [y/N]: ").strip().lower() == "y"
     if skip:
         return None
 
