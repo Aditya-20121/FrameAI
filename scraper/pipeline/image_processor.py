@@ -137,6 +137,15 @@ def normalise_image(raw_bytes: bytes) -> bytes | None:
     return buf.getvalue()
 
 
+def _referer_for_url(url: str) -> str:
+    """Return a plausible Referer for a CDN image URL to avoid 403s."""
+    if "lenskart" in url:
+        return "https://www.lenskart.com/"
+    if "titaneyeplus" in url or "titan" in url.lower():
+        return "https://www.titaneyeplus.com/"
+    return "https://www.google.com/"
+
+
 async def download_and_process(
     session_id: str,
     image_url: str,
@@ -152,8 +161,18 @@ async def download_and_process(
     if norm_path.exists():
         return str(norm_path)
 
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/125.0.0.0 Safari/537.36"
+        ),
+        "Referer": _referer_for_url(image_url),
+        "Accept": "image/webp,image/apng,image/*,*/*;q=0.8",
+    }
+
     try:
-        resp = await client.get(image_url, timeout=20, follow_redirects=True)
+        resp = await client.get(image_url, timeout=20, follow_redirects=True, headers=headers)
         resp.raise_for_status()
         raw_bytes = resp.content
     except Exception as exc:
@@ -188,7 +207,7 @@ async def process_batch(
     results: dict[str, str] = {}
 
     async def _one(product: dict) -> None:
-        url = product.get("image_url")
+        url = product.get("product_image_url") or product.get("image_url")
         sid = product["source_id"]
         if not url:
             return

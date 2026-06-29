@@ -131,10 +131,26 @@ def _rgb_to_colour_name(rgb: tuple[int, int, int]) -> str:
 
 # ── Normaliser pipeline ───────────────────────────────────────────────────────
 
+def extract_style_from_url(image_url: str) -> str | None:
+    """
+    Extract frame style from the product image URL filename.
+    Lenskart filenames contain the shape, e.g.:
+      '...full-rim-rectangle-vincent-chase...jpg'  → 'rectangular'
+    """
+    if not image_url:
+        return None
+    fname = image_url.split("/")[-1].lower()
+    for kw, style in STYLE_MAP.items():
+        if kw in fname:
+            return style
+    return None
+
+
 def normalise_record(raw: dict, image_path: str | None = None) -> dict:
     """
     Apply all normalisation to a raw scraped record:
       - Normalise style and colour strings using maps
+      - If style still unknown, try extracting from image URL filename
       - If style/colour still unknown and image_path given, use CLIP + colour extractor
     """
     record = dict(raw)
@@ -142,6 +158,20 @@ def normalise_record(raw: dict, image_path: str | None = None) -> dict:
     # Style normalisation
     raw_style = str(record.get("raw_style") or "").lower().strip()
     record["style"] = STYLE_MAP.get(raw_style)
+
+    # Fallback: scan image URL filename AND product URL for shape keywords.
+    # Lenskart image filenames embed shape (e.g. '...full-rim-rectangle-...').
+    # Some product buy_urls also contain the shape as part of the slug.
+    if not record["style"]:
+        for url_field in ("product_image_url", "image_url", "buy_url", "product_url"):
+            url_style = extract_style_from_url(record.get(url_field) or "")
+            if url_style:
+                record["style"] = url_style
+                log.debug(
+                    "URL-extracted style for %s from %s: %s",
+                    record.get("source_id"), url_field, url_style,
+                )
+                break
 
     # If style unknown and we have an image, try CLIP
     if not record["style"] and image_path:
@@ -153,9 +183,19 @@ def normalise_record(raw: dict, image_path: str | None = None) -> dict:
         except Exception as exc:
             log.debug("CLIP failed for %s: %s", record.get("source_id"), exc)
 
-    # Colour normalisation
+    # Colour normalisation: try exact match first, then substring scan for
+    # compound values like "black gold" or "blue gunmetal".
     raw_colour = str(record.get("raw_colour") or "").lower().strip()
-    record["colour"] = COLOUR_MAP.get(raw_colour)
+    colour = COLOUR_MAP.get(raw_colour)
+    if not colour and raw_colour:
+        for kw, mapped in COLOUR_MAP.items():
+            if kw in raw_colour:
+                colour = mapped
+                break
+    # Fall back to whatever the normaliser already set
+    if not colour:
+        colour = record.get("colour")
+    record["colour"] = colour
 
     # If colour unknown and we have an image, extract dominant
     if not record["colour"] and image_path:

@@ -12,8 +12,10 @@ from config import STYLE_MAP, COLOUR_MAP
 
 log = logging.getLogger(__name__)
 
-# Minimum required fields for a record to enter the DB
-REQUIRED_FIELDS = ["name", "style", "colour", "retailer", "buy_url"]
+# Minimum required fields for a record to enter the DB.
+# style and colour are intentionally excluded: they are null after scraping
+# and get assigned by CLIP auto-annotation (step 3) or manual annotation later.
+REQUIRED_FIELDS = ["name", "retailer", "buy_url"]
 
 VALID_STYLES = {
     "rectangular", "round", "oval", "square", "cat-eye",

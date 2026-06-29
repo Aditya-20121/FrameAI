@@ -169,6 +169,10 @@ class TitanScraper(BaseScraper):
             image_url = images[0] if images else None
             if isinstance(image_url, dict):
                 image_url = image_url.get("url") or image_url.get("src")
+            # Fix relative URLs (may or may not have a leading slash)
+            if image_url and isinstance(image_url, str) and not image_url.startswith("http"):
+                slash = "" if image_url.startswith("/") else "/"
+                image_url = SOURCE["product_base_url"] + slash + image_url
 
             raw_style = str(p.get("frame_shape") or p.get("frameShape") or p.get("shape") or "")
             raw_colour = str(p.get("colour") or p.get("frame_colour") or p.get("color") or "")
