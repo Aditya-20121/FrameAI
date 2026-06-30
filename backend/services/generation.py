@@ -1,82 +1,98 @@
 """
 Image generation service — Sprint 3.
 
-Pipeline:
-  1. Download user photo from R2
-  2. Optionally run LaMa inpainting to remove existing glasses
-  3. Align frame image to face geometry using nose bridge + IPD landmarks
-  4. Call fal.ai FLUX.1 Kontext [pro] with user photo + aligned frame as references
-  5. Upload result to R2, return key
-"""
-import io
-from typing import Optional
+Model: Segmind Nano Banana v1 ($0.04/generation)
+  https://www.segmind.com/models/nano-banana/api
 
-import fal_client
-import numpy as np
+Pipeline:
+  1. Get presigned URL for user photo (already in R2)
+  2. Get presigned URL for frame product image (already in R2)
+  3. POST both URLs to Nano Banana via image_urls[]
+  4. Convert response to WEBP, upload to R2, return key
+"""
+import base64
+import io
+
+import httpx
 from PIL import Image
 
 from config import settings
 from services import storage
 
-GENERATION_PROMPT = (
-    "Place these glasses on this person's face. "
-    "Preserve the person's identity, skin tone, and lighting. "
-    "The glasses should sit naturally on the nose bridge. "
-    "Do not change the person's face, hair, or background."
-)
-
-FAL_MODEL = "fal-ai/flux-pro/kontext"
+SEGMIND_ENDPOINT = "https://api.segmind.com/v1/nano-banana"
 
 
-async def generate_try_on(
-    job_id: str,
-    frame: dict,
-    task_id: str,
-) -> str:
-    """
-    Run the full generation pipeline.
-    Returns the R2 key of the generated image.
-    Raises on any failure — caller is responsible for not counting this against the limit.
-    """
-    # Download user photo
-    job_photo_bytes = storage.download_photo(f"photos/{job_id}.webp")
-    user_photo_url = _upload_temp_for_fal(job_photo_bytes, f"input_{task_id}_user.webp")
-
-    # Frame product image URL (already in R2, use public URL)
-    frame_image_url = frame["product_image_url"]
-
-    # Call fal.ai
-    result = await _call_fal(user_photo_url, frame_image_url)
-
-    # Download result and store in R2
-    import httpx
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(result["images"][0]["url"])
-        resp.raise_for_status()
-        generated_bytes = resp.content
-
-    r2_key = storage.upload_generated_image(task_id, generated_bytes)
-    return r2_key
-
-
-async def _call_fal(user_image_url: str, frame_image_url: str) -> dict:
-    result = await fal_client.run_async(
-        FAL_MODEL,
-        arguments={
-            "prompt": GENERATION_PROMPT,
-            "image_url": user_image_url,
-            "reference_image_url": frame_image_url,
-            "num_inference_steps": 28,
-            "guidance_scale": 3.5,
-            "output_format": "webp",
-            "image_size": "square_hd",
-        },
+def build_generation_prompt(frame: dict) -> str:
+    colour = (frame.get("colour") or "").strip().lower()
+    style  = (frame.get("style")  or "rectangular").strip().lower()
+    desc   = f"{colour} {style}" if colour else style
+    return (
+        f"Generate an image of the person from image 1 wearing the {desc} eyeglasses "
+        f"exactly as shown in image 2. "
+        f"The glasses should have the same frame colour, material, lens tint, rim thickness, "
+        f"bridge shape, and temple design as shown in image 2. "
+        f"Do not change the frame colour or style. "
+        f"The person's face, hair, skin tone, eye colour, expression, "
+        f"clothing, and background are completely unchanged from image 1."
     )
-    return result
 
 
-def _upload_temp_for_fal(image_bytes: bytes, filename: str) -> str:
-    """Upload bytes to fal.ai storage and return the URL fal can access."""
-    import fal_client as fc
-    url = fc.upload(image_bytes, content_type="image/webp")
-    return url
+async def generate_try_on(job_id: str, frame: dict, task_id: str) -> str:
+    """
+    Full generation pipeline.
+    Returns the R2 key of the generated portrait.
+    Raises on any failure — caller must NOT count failures against the generation limit.
+    """
+    photo_url = storage.get_presigned_url(f"photos/{job_id}.webp")
+    frame_url = _frame_presigned_url(frame["product_image_url"])
+    prompt    = build_generation_prompt(frame)
+
+    portrait_bytes = await _call_segmind(photo_url, frame_url, prompt)
+    return storage.upload_generated_image(task_id, portrait_bytes)
+
+
+def _frame_presigned_url(frame_image_url: str) -> str:
+    r2_key = storage.r2_key_from_url(frame_image_url)
+    if r2_key:
+        return storage.get_presigned_url(r2_key)
+    return frame_image_url
+
+
+async def _call_segmind(person_url: str, frame_url: str, prompt: str) -> bytes:
+    """
+    POST to Segmind Nano Banana v1.
+    Returns portrait as WEBP bytes.
+    """
+    payload = {
+        "prompt":              prompt,
+        "image_urls":          [person_url, frame_url],
+        "aspect_ratio":        "3:4",
+        "response_modalities": "IMAGE",
+    }
+    headers = {
+        "x-api-key":    settings.segmind_api_key,
+        "Content-Type": "application/json",
+    }
+
+    async with httpx.AsyncClient(timeout=120) as client:
+        resp = await client.post(SEGMIND_ENDPOINT, json=payload, headers=headers)
+        resp.raise_for_status()
+
+    content_type = resp.headers.get("content-type", "")
+    if "image" in content_type:
+        raw_bytes = resp.content
+    else:
+        data = resp.json()
+        img_b64 = data.get("image") or data.get("output") or data.get("data")
+        if not img_b64:
+            raise ValueError(f"Unexpected Segmind response keys: {list(data.keys())}")
+        raw_bytes = base64.b64decode(img_b64)
+
+    return _to_webp(raw_bytes)
+
+
+def _to_webp(image_bytes: bytes) -> bytes:
+    img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    buf = io.BytesIO()
+    img.save(buf, format="WEBP", quality=90)
+    return buf.getvalue()

@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     r2_bucket_name: str = "frameai"
     r2_public_domain: str = "https://r2.frameai.in"
 
-    fal_api_key: str = ""
+    segmind_api_key: str = ""
     redis_url: str = "redis://localhost:6379"
     session_secret: str
 
@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+        extra = "ignore"  # tolerate unknown env vars (e.g. old FAL_API_KEY)
 
 
 @lru_cache

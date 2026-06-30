@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api import upload, analysis, recommendations, generate
+from api import upload, analysis, recommendations, generate, catalogue
 from config import settings
 
 app = FastAPI(
@@ -22,6 +22,7 @@ app.include_router(upload.router, tags=["upload"])
 app.include_router(analysis.router, tags=["analysis"])
 app.include_router(recommendations.router, tags=["recommendations"])
 app.include_router(generate.router, tags=["generate"])
+app.include_router(catalogue.router)
 
 
 @app.get("/health")

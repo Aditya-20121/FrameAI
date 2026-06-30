@@ -13,7 +13,10 @@ build/
 venv/
 env/
 .env
+.env.local
+.env.*.local
 !.env.example
+!.env.local.example
 
 # Scraper outputs (data, not code)
 scraper/output/raw/
@@ -52,3 +55,8 @@ node_modules/
 .pytest_cache/
 htmlcov/
 .coverage
+backend/test_output/
+
+# Scraper annotation outputs (generated, not source)
+scraper/annotation/no_style_records.json
+scraper/annotation/style_predictions.csv

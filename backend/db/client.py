@@ -202,3 +202,35 @@ def query_frames(
         .execute()
     )
     return result.data or []
+
+
+def browse_frames(
+    style: str | None = None,
+    retailer: str | None = None,
+    limit: int = 20,
+    offset: int = 0,
+) -> list[dict]:
+    q = (
+        _client()
+        .table("frames")
+        .select("frame_id,name,style,colour,colour_hex,material,retailer,price_inr,buy_url,product_image_url,vibe_tags")
+        .not_.is_("product_image_url", "null")
+        .order("created_at", desc=True)
+        .range(offset, offset + limit - 1)
+    )
+    if style:
+        q = q.eq("style", style)
+    if retailer:
+        q = q.eq("retailer", retailer)
+    return q.execute().data or []
+
+
+def get_distinct_styles() -> list[str]:
+    result = (
+        _client()
+        .table("frames")
+        .select("style")
+        .not_.is_("style", "null")
+        .execute()
+    )
+    return sorted({row["style"] for row in (result.data or []) if row.get("style")})

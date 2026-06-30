@@ -1,5 +1,5 @@
 """
-Celery task: fal.ai FLUX.1 Kontext try-on generation.
+Celery task: Segmind Nano Banana v1 try-on generation.
 
 Counter increments only on success — a failed or retried task never costs
 the user a generation slot.
@@ -29,7 +29,7 @@ def generate_try_on(
     session_token: str,
 ) -> None:
     """
-    Run fal.ai FLUX.1 Kontext generation for one frame + user photo pair.
+    Run Nano Banana v1 generation for one frame + user photo pair.
     Writes status updates to generation_tasks table throughout.
     Increments session generation counter only on successful completion.
     """

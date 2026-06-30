@@ -41,7 +41,7 @@ def upload_photo(job_id: str, image_bytes: bytes, content_type: str) -> str:
 
 
 def upload_generated_image(task_id: str, image_bytes: bytes) -> str:
-    """Upload a generated composite image. Returns the R2 object key."""
+    """Upload a generated portrait image. Returns the R2 object key."""
     key = f"generated/{task_id}.webp"
     expires_at = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
 
@@ -68,6 +68,42 @@ def download_photo(key: str) -> bytes:
     """Download raw bytes for a stored photo (used by face analysis worker)."""
     response = _r2().get_object(Bucket=settings.r2_bucket_name, Key=key)
     return response["Body"].read()
+
+
+def download_object(key: str) -> bytes:
+    """Download any R2 object by key."""
+    response = _r2().get_object(Bucket=settings.r2_bucket_name, Key=key)
+    return response["Body"].read()
+
+
+def r2_key_from_url(url: str) -> str | None:
+    """
+    Extract the R2 object key from a public URL.
+    e.g. 'https://r2.frameai.in/frames/abc.webp' → 'frames/abc.webp'
+    Returns None if the URL is not an R2 URL.
+    """
+    domain = settings.r2_public_domain.rstrip("/")
+    if url.startswith(domain):
+        return url[len(domain):].lstrip("/")
+    return None
+
+
+def upload_temp_and_presign(key: str, image_bytes: bytes, content_type: str = "image/jpeg") -> str:
+    """Upload bytes to R2 and return a 1-hour presigned GET URL (used to pass images to external APIs)."""
+    expires_at = (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()
+    _r2().put_object(
+        Bucket=settings.r2_bucket_name,
+        Key=key,
+        Body=image_bytes,
+        ContentType=content_type,
+        Metadata={"expires_at": expires_at},
+    )
+    return get_presigned_url(key, expiry=3600)
+
+
+def delete_object(key: str) -> None:
+    """Delete a single R2 object by key."""
+    _r2().delete_object(Bucket=settings.r2_bucket_name, Key=key)
 
 
 def public_url(key: str) -> str:
