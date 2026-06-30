@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, Upload
 log = logging.getLogger(__name__)
 
 from api.session import get_or_create_session
-from main import limiter
+from limiter import limiter
 from models.schemas import UploadResponse
 from services import face_analysis, storage
 from db import client as db

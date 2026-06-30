@@ -17,7 +17,7 @@ from uuid import UUID
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 
 from api.session import require_session
-from main import limiter
+from limiter import limiter
 from models.schemas import (
     GenerateRequest,
     GenerateResponse,
