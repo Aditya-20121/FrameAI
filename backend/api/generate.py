@@ -30,7 +30,8 @@ log = logging.getLogger(__name__)
 router = APIRouter()
 
 GENERATION_LIMIT = 3
-_IS_PROD = os.getenv("ENVIRONMENT", "development").lower() == "production"
+_IS_PROD    = os.getenv("ENVIRONMENT", "development").lower() == "production"
+_USE_CELERY = os.getenv("USE_CELERY", "false").lower() == "true"
 
 
 async def _run_generation_bg(task_id: str, job_id: str, frame_id: str, session_token: str) -> None:
@@ -83,11 +84,10 @@ async def request_generation(
         str(body.job_id), str(body.frame_id), session_token
     )
 
-    if _IS_PROD:
-        from tasks.generate import generate_try_on
-        generate_try_on.delay(task_id, str(body.job_id), str(body.frame_id), session_token)
+    if _USE_CELERY:
+        from tasks.generate import generate_try_on as celery_generate
+        celery_generate.delay(task_id, str(body.job_id), str(body.frame_id), session_token)
     else:
-        # Dev: run directly in FastAPI background thread (no Celery worker needed)
         background_tasks.add_task(
             _run_generation_bg, task_id, str(body.job_id), str(body.frame_id), session_token
         )

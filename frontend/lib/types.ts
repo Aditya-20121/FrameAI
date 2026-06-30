@@ -1,6 +1,10 @@
-export type FaceShape = 'oval' | 'round' | 'square' | 'heart' | 'diamond' | 'oblong'
-export type Undertone = 'warm' | 'cool' | 'neutral'
-export type SizeBand = 'narrow' | 'standard' | 'wide'
+export type FaceShape  = 'oval' | 'round' | 'square' | 'heart' | 'diamond' | 'oblong'
+export type Undertone  = 'warm' | 'cool' | 'neutral'
+export type SizeBand   = 'narrow' | 'standard' | 'wide'
+export type Jawline    = 'angular' | 'soft' | 'tapered'
+export type Cheekbones = 'high' | 'normal' | 'low'
+export type EyeSet     = 'close' | 'average' | 'wide'
+export type SkinDepth  = 'fair' | 'light' | 'medium' | 'olive' | 'deep'
 
 export interface UploadResponse {
   job_id: string
@@ -13,9 +17,13 @@ export interface AnalysisResponse {
   face_shape?: FaceShape
   face_shape_confidence?: number
   face_shape_explanation?: string
+  jawline?: Jawline
+  cheekbones?: Cheekbones
+  eye_set?: EyeSet
   undertone?: Undertone
   undertone_confidence?: number
   undertone_hex?: string
+  skin_depth?: SkinDepth
   ipd_mm?: number
   size_band?: SizeBand
 }

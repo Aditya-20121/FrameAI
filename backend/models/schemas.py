@@ -18,9 +18,13 @@ class UploadError(BaseModel):
 
 # ── Analysis ──────────────────────────────────────────────────────────────────
 
-FaceShape = Literal["oval", "round", "square", "heart", "diamond", "oblong"]
-Undertone = Literal["warm", "cool", "neutral"]
-SizeBand = Literal["narrow", "standard", "wide"]
+FaceShape  = Literal["oval", "round", "square", "heart", "diamond", "oblong"]
+Undertone  = Literal["warm", "cool", "neutral"]
+SizeBand   = Literal["narrow", "standard", "wide"]
+Jawline    = Literal["angular", "soft", "tapered"]
+Cheekbones = Literal["high", "normal", "low"]
+EyeSet     = Literal["close", "average", "wide"]
+SkinDepth  = Literal["fair", "light", "medium", "olive", "deep"]
 
 
 class AnalysisResult(BaseModel):
@@ -29,9 +33,13 @@ class AnalysisResult(BaseModel):
     face_shape: FaceShape | None = None
     face_shape_confidence: float | None = Field(None, ge=0.0, le=1.0)
     face_shape_explanation: str | None = None
+    jawline: Jawline | None = None
+    cheekbones: Cheekbones | None = None
+    eye_set: EyeSet | None = None
     undertone: Undertone | None = None
     undertone_confidence: float | None = Field(None, ge=0.0, le=1.0)
     undertone_hex: str | None = None
+    skin_depth: SkinDepth | None = None
     ipd_mm: float | None = None
     size_band: SizeBand | None = None
 

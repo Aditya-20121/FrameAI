@@ -13,7 +13,7 @@ const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API}${path}`, { credentials: 'include', ...init })
   const data = await res.json()
-  if (!res.ok) throw data
+  if (!res.ok) throw data?.detail ?? data
   return data as T
 }
 

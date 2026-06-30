@@ -50,7 +50,12 @@ export default function AnalysePage() {
         <Link href="/" className="text-stone-400 p-1 -ml-1 active:text-white transition-colors">
           <ArrowLeft className="w-5 h-5" />
         </Link>
-        <span className="text-white font-bold text-lg">FrameAI</span>
+        <div className="flex items-center gap-1.5">
+          <div className="w-6 h-6 bg-amber-500 rounded-md flex items-center justify-center flex-shrink-0">
+            <span className="text-white text-[10px] font-black">F</span>
+          </div>
+          <span className="text-white font-bold">FrameAI</span>
+        </div>
         {mode === 'camera' && (
           <button
             onClick={() => setMode('upload')}

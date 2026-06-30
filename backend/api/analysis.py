@@ -32,15 +32,25 @@ async def get_analysis(
     if job["status"] not in ("complete",):
         return AnalysisResult(job_id=job_id, status="failed")
 
+    # face_features is a JSONB column — Supabase returns it as a dict already
+    ff = job.get("face_features") or {}
+    if isinstance(ff, str):
+        import json as _json
+        ff = _json.loads(ff)
+
     return AnalysisResult(
         job_id=job_id,
         status="complete",
         face_shape=job["face_shape"],
         face_shape_confidence=job["face_shape_conf"],
-        face_shape_explanation=_shape_explanation(job["face_shape"]),
+        face_shape_explanation=ff.get("face_shape_explanation") or _shape_explanation(job["face_shape"]),
+        jawline=ff.get("jawline"),
+        cheekbones=ff.get("cheekbones"),
+        eye_set=ff.get("eye_set"),
         undertone=job["undertone"],
         undertone_confidence=job["undertone_conf"],
         undertone_hex=job["undertone_hex"],
+        skin_depth=ff.get("skin_depth"),
         ipd_mm=job["ipd_mm"],
         size_band=job["size_band"],
     )

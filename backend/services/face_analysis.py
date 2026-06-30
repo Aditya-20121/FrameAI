@@ -37,16 +37,20 @@ _LM_LEFT_INNER   = 133;  _LM_RIGHT_INNER = 362
 
 QWEN_ENDPOINT = "https://api.segmind.com/v1/qwen3-vl-flash"
 
-ANALYSIS_PROMPT = """Look at this portrait photo and analyse the person's face.
+ANALYSIS_PROMPT = """Look at this portrait photo and analyse the person's face using professional optometry standards.
 Return ONLY a valid JSON object — no markdown fences, no extra text:
 
 {
   "face_shape": "<oval|round|square|heart|diamond|oblong>",
   "face_shape_confidence": <float 0.0-1.0>,
   "face_shape_explanation": "<2-sentence plain English explanation referencing specific proportions visible in this photo>",
+  "jawline": "<angular|soft|tapered>",
+  "cheekbones": "<high|normal|low>",
+  "eye_set": "<close|average|wide>",
   "undertone": "<warm|cool|neutral>",
   "undertone_confidence": <float 0.0-1.0>,
-  "undertone_hex": "<#RRGGBB approximation of the person's skin tone>"
+  "undertone_hex": "<#RRGGBB approximation of the person's skin tone>",
+  "skin_depth": "<fair|light|medium|olive|deep>"
 }
 
 Face shape definitions:
@@ -57,10 +61,32 @@ Face shape definitions:
 - diamond: narrow forehead AND narrow jaw, wide prominent cheekbones
 - oblong: significantly longer than wide, even proportions top to bottom
 
-Undertone definitions:
-- warm: golden, yellow, peachy, or olive tones
-- cool: pink, rosy, reddish, or bluish-pink tones
-- neutral: balanced beige, mix of warm and cool"""
+Jawline definitions:
+- angular: sharp, clearly defined jaw with visible angles at the corners
+- soft: rounded, curved jaw — no sharp angles
+- tapered: jaw gradually and evenly narrows toward the chin
+
+Cheekbone definitions:
+- high: prominent, visible bone structure clearly above the midface
+- normal: average prominence, not a defining feature
+- low: cheekbones sit below the midface, not prominent
+
+Eye set definitions:
+- close: eyes appear close to the nose bridge, narrow inner canthal distance
+- average: balanced, standard spacing between the eyes
+- wide: noticeable gap between the eyes relative to face width
+
+Skin undertone definitions (this is constant — it does not change with sun exposure):
+- warm: golden, yellow, peachy, or olive base tones
+- cool: pink, rosy, reddish, or bluish-pink base tones
+- neutral: balanced beige — mix of warm and cool
+
+Skin depth definitions (how much melanin/pigmentation):
+- fair: very light, minimal melanin — skin appears pale or porcelain
+- light: light skin with slightly more pigmentation than fair
+- medium: middle range — golden to light brown tones
+- olive: medium depth with a yellow-green cast
+- deep: rich, high melanin — from brown to deep brown"""
 
 FACE_SHAPE_EXPLANATIONS = {
     "oval": (
@@ -119,9 +145,13 @@ class AnalysisResult:
     face_shape: str
     face_shape_confidence: float
     face_shape_explanation: str
+    jawline: str           # angular | soft | tapered
+    cheekbones: str        # high | normal | low
+    eye_set: str           # close | average | wide
     undertone: str
     undertone_confidence: float
     undertone_hex: str
+    skin_depth: str        # fair | light | medium | olive | deep
     ipd_mm: float
     size_band: str
     landmarks: list
@@ -291,23 +321,31 @@ async def _call_qwen_vision(image_bytes: bytes) -> dict:
 
 # ── Top-level entry point ──────────────────────────────────────────────────────
 
-_VALID_SHAPES = {"oval", "round", "square", "heart", "diamond", "oblong"}
-_VALID_TONES  = {"warm", "cool", "neutral"}
+_VALID_SHAPES     = {"oval", "round", "square", "heart", "diamond", "oblong"}
+_VALID_TONES      = {"warm", "cool", "neutral"}
+_VALID_JAWLINES   = {"angular", "soft", "tapered"}
+_VALID_CHEEKBONES = {"high", "normal", "low"}
+_VALID_EYE_SET    = {"close", "average", "wide"}
+_VALID_SKIN_DEPTH = {"fair", "light", "medium", "olive", "deep"}
 
 
 async def run_face_analysis(image_bytes: bytes) -> AnalysisResult:
     """
-    Full pipeline — raises ValueError with error code on validation failures.
+    Full pipeline. Assumes image + face already validated by the caller.
 
-    Stage 1: MediaPipe → validate image, count faces, extract landmarks → IPD + size_band
-    Stage 2: Qwen3 VL Flash → face shape + undertone + explanation
+    Stage 1: MediaPipe FaceMesh → landmarks → IPD + size_band (best-effort)
+    Stage 2: Qwen3 VL Flash → face shape + features + undertone + skin depth
              Falls back to geometric rules if Qwen call fails.
     """
-    bgr = validate_image(image_bytes)
-    validate_faces(bgr)
+    bgr = cv2.imdecode(np.frombuffer(image_bytes, np.uint8), cv2.IMREAD_COLOR)
+    if bgr is None:
+        raise ValueError("unsupported_format")
 
     h, w = bgr.shape[:2]
-    landmarks = extract_landmarks(bgr)
+    try:
+        landmarks = extract_landmarks(bgr)
+    except Exception:
+        landmarks = None
 
     if landmarks is not None:
         geometry  = compute_geometry(landmarks, w, h)
@@ -322,19 +360,28 @@ async def run_face_analysis(image_bytes: bytes) -> AnalysisResult:
     face_shape = "oval";  confidence = 0.80
     explanation = FACE_SHAPE_EXPLANATIONS["oval"]
     undertone = "neutral"; undertone_conf = 0.75; undertone_hex = "#C8956C"
+    jawline = "soft"; cheekbones = "normal"; eye_set = "average"; skin_depth = "medium"
 
     try:
         q = await _call_qwen_vision(image_bytes)
 
         fs = q.get("face_shape", "oval").lower().strip()
         ut = q.get("undertone", "neutral").lower().strip()
+        jl = q.get("jawline", "soft").lower().strip()
+        cb = q.get("cheekbones", "normal").lower().strip()
+        es = q.get("eye_set", "average").lower().strip()
+        sd = q.get("skin_depth", "medium").lower().strip()
 
-        face_shape     = fs if fs in _VALID_SHAPES else "oval"
+        face_shape     = fs if fs in _VALID_SHAPES     else "oval"
         confidence     = float(q.get("face_shape_confidence", 0.85))
         explanation    = q.get("face_shape_explanation") or FACE_SHAPE_EXPLANATIONS[face_shape]
-        undertone      = ut if ut in _VALID_TONES else "neutral"
+        undertone      = ut if ut in _VALID_TONES      else "neutral"
         undertone_conf = float(q.get("undertone_confidence", 0.80))
         undertone_hex  = q.get("undertone_hex", "#C8956C")
+        jawline        = jl if jl in _VALID_JAWLINES   else "soft"
+        cheekbones     = cb if cb in _VALID_CHEEKBONES else "normal"
+        eye_set        = es if es in _VALID_EYE_SET    else "average"
+        skin_depth     = sd if sd in _VALID_SKIN_DEPTH else "medium"
 
     except Exception:
         if geometry is not None:
@@ -345,9 +392,13 @@ async def run_face_analysis(image_bytes: bytes) -> AnalysisResult:
         face_shape=face_shape,
         face_shape_confidence=round(confidence, 3),
         face_shape_explanation=explanation,
+        jawline=jawline,
+        cheekbones=cheekbones,
+        eye_set=eye_set,
         undertone=undertone,
         undertone_confidence=round(undertone_conf, 3),
         undertone_hex=undertone_hex,
+        skin_depth=skin_depth,
         ipd_mm=ipd_mm,
         size_band=size_band,
         landmarks=list(landmarks) if landmarks is not None else [],

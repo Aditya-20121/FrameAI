@@ -8,9 +8,12 @@ Analysis pipeline:
   4. Qwen3 VL Flash → face shape + undertone (with geometric fallback)
   5. Write results to jobs table
 """
+import logging
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile, File
+
+log = logging.getLogger(__name__)
 
 from api.session import get_or_create_session
 from models.schemas import UploadResponse
@@ -79,8 +82,17 @@ async def upload_photo(
             undertone_hex=result.undertone_hex,
             ipd_mm=result.ipd_mm,
             size_band=result.size_band,
+            face_features={
+                "jawline": result.jawline,
+                "cheekbones": result.cheekbones,
+                "eye_set": result.eye_set,
+                "skin_depth": result.skin_depth,
+                "face_shape_explanation": result.face_shape_explanation,
+            },
         )
     except Exception:
+        import traceback; traceback.print_exc()
+        log.exception("Face analysis failed for job %s", job_id)
         db.fail_job(job_id)
         raise HTTPException(
             status_code=500,

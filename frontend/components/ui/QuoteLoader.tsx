@@ -31,13 +31,13 @@ export default function QuoteLoader({
   }, [])
 
   useEffect(() => {
-    const INTERVAL = 3500
+    const INTERVAL = 6000
     const id = setInterval(() => {
       setVisible(false)
       setTimeout(() => {
         setIndex(i => (i + 1) % pool.length)
         setVisible(true)
-      }, 300)
+      }, 500)
     }, INTERVAL)
     return () => clearInterval(id)
   }, [pool.length])
@@ -62,7 +62,7 @@ export default function QuoteLoader({
       <div className="flex flex-col items-center gap-2.5 py-5 px-4 text-center">
         <div className="w-5 h-5 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
         <p
-          className={`text-xs leading-relaxed italic transition-opacity duration-300 max-w-[220px] ${bodyText} ${
+          className={`text-xs leading-relaxed italic transition-opacity duration-500 max-w-[220px] ${bodyText} ${
             visible ? 'opacity-100' : 'opacity-0'
           }`}
         >
@@ -79,7 +79,7 @@ export default function QuoteLoader({
 
       {/* Quote */}
       <p
-        className={`text-sm leading-relaxed italic transition-opacity duration-300 ${bodyText} ${
+        className={`text-sm leading-relaxed italic transition-opacity duration-500 ${bodyText} ${
           visible ? 'opacity-100' : 'opacity-0'
         }`}
       >

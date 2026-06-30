@@ -86,8 +86,9 @@ def update_job_analysis(
     undertone_hex: str,
     ipd_mm: float,
     size_band: str,
+    face_features: dict | None = None,
 ) -> None:
-    _client().table("jobs").update({
+    payload: dict = {
         "face_shape": face_shape,
         "face_shape_conf": face_shape_conf,
         "undertone": undertone,
@@ -96,7 +97,10 @@ def update_job_analysis(
         "ipd_mm": ipd_mm,
         "size_band": size_band,
         "status": "complete",
-    }).eq("job_id", job_id).execute()
+    }
+    if face_features is not None:
+        payload["face_features"] = face_features  # JSONB — pass dict directly
+    _client().table("jobs").update(payload).eq("job_id", job_id).execute()
 
 
 def fail_job(job_id: str, reason: str = "analysis_failed") -> None:
@@ -185,18 +189,18 @@ def get_frame(frame_id: str) -> dict | None:
 
 def query_frames(
     best_styles: list[str],
-    best_colours: list[str],
-    boost_styles: list[str],
-    min_width: int,
-    max_width: int,
-    limit: int = 15,
+    limit: int = 500,
 ) -> list[dict]:
+    """
+    Pull all candidate frames matching the face-shape style list.
+    Colour scoring and all other signals are applied in Python (recommender.py).
+    500 limit safely covers our full catalogue (~358 frames).
+    """
     result = (
         _client()
         .table("frames")
         .select("*")
         .in_("style", best_styles)
-        .in_("colour", best_colours)
         .not_.is_("product_image_url", "null")
         .limit(limit)
         .execute()

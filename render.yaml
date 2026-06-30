@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: frameai-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    plan: free
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: USE_CELERY
+        value: false
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      # Set these in the Render dashboard (never commit real values):
+      # SUPABASE_URL
+      # SUPABASE_SERVICE_KEY
+      # R2_ACCOUNT_ID
+      # R2_ACCESS_KEY_ID
+      # R2_SECRET_ACCESS_KEY
+      # R2_BUCKET_NAME
+      # R2_PUBLIC_DOMAIN
+      # SEGMIND_API_KEY
+      # SESSION_SECRET
+      # ALLOWED_ORIGINS   ← set to your Vercel URL after deploying frontend

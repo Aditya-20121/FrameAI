@@ -1,6 +1,5 @@
 """
 GET /recommendations/{job_id} — return top 10 ranked frame recommendations.
-Sprint 2: requires seed catalogue in Supabase frames table.
 """
 from uuid import UUID
 
@@ -8,13 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from api.session import require_session
 from models.schemas import RecommendationsResponse, FrameRecommendation
-from services.recommender import (
-    rank_frames,
-    FACE_SHAPE_RULES,
-    UNDERTONE_RULES,
-    IPD_SIZE_RULES,
-    get_size_band,
-)
+from services.recommender import FACE_SHAPE_RULES, rank_frames
 from db import client as db
 from services.storage import presign_frame_url
 
@@ -36,24 +29,39 @@ async def get_recommendations(
         raise HTTPException(status_code=400, detail="Analysis not complete yet.")
 
     face_shape: str = job["face_shape"]
-    tone: str = job["undertone"]
-    ipd_mm: float = job["ipd_mm"] or 63.0
+    undertone: str  = job["undertone"]
+    ipd_mm: float   = job["ipd_mm"] or 63.0
+
+    # Pull extra features from face_features JSONB (may be None for older jobs)
+    ff = job.get("face_features") or {}
+    if isinstance(ff, str):
+        import json as _json
+        ff = _json.loads(ff)
+
+    skin_depth: str | None = ff.get("skin_depth")
+    jawline:    str | None = ff.get("jawline")
+    cheekbones: str | None = ff.get("cheekbones")
+    eye_set:    str | None = ff.get("eye_set")
 
     shape_rules = FACE_SHAPE_RULES[face_shape]
-    colour_rules = UNDERTONE_RULES[tone]
-    size_band = get_size_band(ipd_mm)
-    min_w, max_w = IPD_SIZE_RULES[size_band]["frame_width_mm"]
 
+    # Broad candidate pool filtered by face-shape styles only.
+    # Colour scoring + all other signals applied in Python below.
     raw_frames = db.query_frames(
         best_styles=shape_rules["best_styles"],
-        best_colours=colour_rules["best_colours"],
-        boost_styles=shape_rules["score_boost"],
-        min_width=min_w - 10,   # ±10mm tolerance so we always get results
-        max_width=max_w + 10,
-        limit=30,
     )
 
-    ranked = rank_frames(raw_frames, face_shape, tone, ipd_mm, top_n=10)
+    ranked = rank_frames(
+        raw_frames,
+        face_shape=face_shape,
+        undertone=undertone,
+        ipd_mm=ipd_mm,
+        skin_depth=skin_depth,
+        jawline=jawline,
+        cheekbones=cheekbones,
+        eye_set=eye_set,
+        top_n=10,
+    )
 
     recommendations = [
         FrameRecommendation(

@@ -53,9 +53,14 @@ export default function CatalogueSection() {
 
   return (
     <section id="catalogue" className="px-4 py-10">
-      <div className="flex items-baseline justify-between mb-4">
-        <h2 className="text-xl font-bold text-stone-900">Browse Frames</h2>
-        <span className="text-stone-400 text-sm">400+ frames</span>
+      <div className="mb-5">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-amber-500 mb-1">
+          Catalogue
+        </p>
+        <div className="flex items-end justify-between">
+          <h2 className="text-xl font-extrabold text-stone-900 tracking-tight">Browse frames</h2>
+          <span className="text-stone-400 text-xs">400+ styles</span>
+        </div>
       </div>
 
       {/* Style filter tabs — horizontal scroll */}

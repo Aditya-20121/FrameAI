@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { ExternalLink } from 'lucide-react'
+import { ExternalLink, ShoppingBag } from 'lucide-react'
 import type { Frame } from '@/lib/types'
 import { postGenerate, getGenerateStatus } from '@/lib/api'
 import GenerationModal from './GenerationModal'
@@ -17,12 +17,12 @@ type Props = {
 }
 
 export default function FrameCard({ frame, jobId, generationsRemaining, onComplete }: Props) {
-  const [status, setStatus] = useState<GenStatus>('idle')
-  const [imageUrl, setImageUrl] = useState<string | null>(null)
+  const [status, setStatus]       = useState<GenStatus>('idle')
+  const [imageUrl, setImageUrl]   = useState<string | null>(null)
   const [showConfirm, setShowConfirm] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError]         = useState<string | null>(null)
   const [imgFailed, setImgFailed] = useState(false)
-  const remainingAtClick = useRef(generationsRemaining)
+  const remainingAtClick          = useRef(generationsRemaining)
 
   async function startGeneration() {
     remainingAtClick.current = generationsRemaining
@@ -61,28 +61,21 @@ export default function FrameCard({ frame, jobId, generationsRemaining, onComple
     throw { message: 'Generation timed out. This try was not counted — you can retry.' }
   }
 
-  const canTryOn = generationsRemaining > 0 && (status === 'idle' || status === 'failed')
+  const canTryOn     = generationsRemaining > 0 && (status === 'idle' || status === 'failed')
   const isGenerating = status === 'generating'
 
-  function buttonLabel() {
-    if (isGenerating)             return 'Generating…'
-    if (status === 'complete')    return '✓ Try-on done'
-    if (status === 'failed')      return 'Try again'
-    if (generationsRemaining === 0) return 'No tries left'
-    return 'Try this on →'
-  }
-
   const RETAILER_COLORS: Record<string, string> = {
-    'Lenskart':   'bg-teal-50 text-teal-700',
-    'Titan Eye+': 'bg-blue-50 text-blue-700',
-    'John Jacobs':'bg-purple-50 text-purple-700',
-    'Rayban':     'bg-red-50 text-red-700',
+    'Lenskart':    'bg-teal-50 text-teal-700',
+    'Titan Eye+':  'bg-blue-50 text-blue-700',
+    'John Jacobs': 'bg-purple-50 text-purple-700',
+    'Rayban':      'bg-red-50 text-red-700',
   }
   const retailerClass = RETAILER_COLORS[frame.retailer] || 'bg-stone-100 text-stone-500'
 
   return (
     <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
-      {/* Image area */}
+
+      {/* ── Image ────────────────────────────────────────────────── */}
       <div className="relative bg-stone-50 w-full aspect-square">
         {imgFailed && !imageUrl ? (
           <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-stone-300">
@@ -103,33 +96,39 @@ export default function FrameCard({ frame, jobId, generationsRemaining, onComple
           />
         )}
 
-        {/* Rank + retailer badges */}
-        <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">
+        {/* Top-left: rank */}
+        <div className="absolute top-2.5 left-2.5">
           <span className="bg-stone-900/70 backdrop-blur-sm text-white text-xs font-bold px-2 py-0.5 rounded-full">
             #{frame.rank}
           </span>
-          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${retailerClass}`}>
-            {frame.retailer}
+        </div>
+
+        {/* Top-right: match % badge */}
+        <div className="absolute top-2.5 right-2.5">
+          <span className="bg-amber-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+            {Math.round(frame.score)}% match
           </span>
         </div>
 
-        {/* Generation overlay with rotating quotes */}
+        {/* Generation overlay */}
         {isGenerating && (
           <div className="absolute inset-0 bg-white/90 backdrop-blur-sm flex items-center justify-center">
             <QuoteLoader category="tryon" estimatedSeconds={20} />
           </div>
         )}
 
-        {/* Try-on complete badge */}
+        {/* Try-on complete overlay badge */}
         {status === 'complete' && imageUrl && (
           <div className="absolute bottom-2.5 left-2.5 bg-green-500 text-white text-xs font-bold px-2.5 py-1 rounded-full">
-            AI Try-On ✓
+            AI Try-On
           </div>
         )}
       </div>
 
-      {/* Frame info */}
+      {/* ── Info ─────────────────────────────────────────────────── */}
       <div className="p-4">
+
+        {/* Name + price */}
         <div className="flex items-start justify-between gap-2 mb-1">
           <p className="text-stone-900 font-semibold text-sm leading-snug flex-1">{frame.name}</p>
           {frame.price_inr != null && (
@@ -138,30 +137,28 @@ export default function FrameCard({ frame, jobId, generationsRemaining, onComple
             </span>
           )}
         </div>
-        <p className="text-stone-400 text-xs mb-2 capitalize">
+
+        {/* Style · colour · material */}
+        <p className="text-stone-400 text-xs mb-1.5 capitalize">
           {[frame.style, frame.colour, frame.material].filter(Boolean).join(' · ')}
         </p>
 
+        {/* Retailer pill */}
+        <span className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full mb-3 ${retailerClass}`}>
+          {frame.retailer}
+        </span>
+
+        {/* Why this frame */}
         {frame.explanation && (
           <p className="text-stone-500 text-xs leading-relaxed line-clamp-2 mb-3">
             {frame.explanation}
           </p>
         )}
 
+        {/* Error */}
         {error && (
           <p className="text-red-500 text-xs mb-3 leading-relaxed">{error}</p>
         )}
-
-        {/* Score bar */}
-        <div className="flex items-center gap-2 mb-3">
-          <div className="flex-1 h-1.5 bg-stone-100 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-amber-400 rounded-full"
-              style={{ width: `${Math.min(100, frame.score)}%` }}
-            />
-          </div>
-          <span className="text-xs text-stone-400 font-medium">{Math.round(frame.score)}% match</span>
-        </div>
 
         {/* CTA row */}
         <div className="flex gap-2">
@@ -172,11 +169,19 @@ export default function FrameCard({ frame, jobId, generationsRemaining, onComple
               ${canTryOn && !isGenerating
                 ? 'bg-amber-500 text-white shadow-md shadow-amber-100'
                 : status === 'complete'
-                  ? 'bg-green-50 border border-green-200 text-green-700 cursor-default'
+                  ? 'bg-green-50 border border-green-200 text-green-600 cursor-default'
                   : 'bg-stone-100 text-stone-400 cursor-not-allowed'
               }`}
           >
-            {buttonLabel()}
+            {isGenerating
+              ? 'Generating…'
+              : status === 'complete'
+                ? 'Try-on complete'
+                : status === 'failed'
+                  ? 'Retry'
+                  : generationsRemaining === 0
+                    ? 'No tries left'
+                    : 'Try this on'}
           </button>
 
           <a
@@ -184,9 +189,10 @@ export default function FrameCard({ frame, jobId, generationsRemaining, onComple
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 px-4 py-3 rounded-xl border border-stone-200 text-stone-600 text-sm font-medium active:bg-stone-50 transition-colors"
+            title={`Buy at ${frame.retailer}`}
           >
-            Buy
-            <ExternalLink className="w-3.5 h-3.5" />
+            <ShoppingBag className="w-3.5 h-3.5" />
+            <ExternalLink className="w-3 h-3 text-stone-300" />
           </a>
         </div>
       </div>
