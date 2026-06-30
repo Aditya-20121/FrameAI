@@ -133,10 +133,15 @@ export default function Home() {
             </div>
             <span className="text-stone-900 font-bold text-sm">FrameAI</span>
           </div>
-          <p className="text-stone-400 text-xs text-center">
-            Frames sourced from Lenskart & John Jacobs India.
-            Affiliate links keep this free.
-          </p>
+          <div className="flex flex-col items-center gap-1.5 text-center">
+            <p className="text-stone-400 text-xs">
+              Frames sourced from Lenskart & John Jacobs India.
+              Affiliate links keep this free.
+            </p>
+            <Link href="/privacy" className="text-stone-400 text-xs underline underline-offset-2 hover:text-stone-600 transition-colors">
+              Privacy Policy
+            </Link>
+          </div>
         </div>
       </footer>
 

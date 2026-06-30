@@ -14,9 +14,10 @@ import logging
 import os
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 
 from api.session import require_session
+from main import limiter
 from models.schemas import (
     GenerateRequest,
     GenerateResponse,
@@ -59,7 +60,9 @@ async def _run_generation_bg(task_id: str, job_id: str, frame_id: str, session_t
 
 
 @router.post("/generate", response_model=GenerateResponse)
+@limiter.limit("10/hour")
 async def request_generation(
+    request: Request,
     body: GenerateRequest,
     background_tasks: BackgroundTasks,
     session_token: str = Depends(require_session),

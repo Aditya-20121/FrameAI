@@ -11,11 +11,12 @@ Analysis pipeline:
 import logging
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, UploadFile, File
 
 log = logging.getLogger(__name__)
 
 from api.session import get_or_create_session
+from main import limiter
 from models.schemas import UploadResponse
 from services import face_analysis, storage
 from db import client as db
@@ -36,7 +37,9 @@ _ERROR_MESSAGES = {
 
 
 @router.post("/upload", response_model=UploadResponse)
+@limiter.limit("5/hour")
 async def upload_photo(
+    request: Request,
     response: Response,
     photo: UploadFile = File(...),
     session_token: str = Depends(get_or_create_session),
