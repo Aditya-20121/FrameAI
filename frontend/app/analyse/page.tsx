@@ -44,7 +44,7 @@ export default function AnalysePage() {
   }
 
   return (
-    <main className="relative flex flex-col min-h-screen bg-stone-900 overflow-hidden">
+    <main className="relative flex flex-col h-[100dvh] bg-stone-900 overflow-hidden">
       {/* Dark header for camera screen */}
       <header className="flex items-center gap-3 px-4 py-3 z-10 flex-shrink-0">
         <Link href="/" className="text-stone-400 p-1 -ml-1 active:text-white transition-colors">

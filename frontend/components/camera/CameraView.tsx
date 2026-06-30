@@ -173,13 +173,14 @@ export default function CameraView({ onCapture, onSwitchToUpload, onNoCameraAvai
         </div>
       </div>
 
-      {/* Camera feed */}
+      {/* Camera feed — mirrored so it feels like a mirror to the user */}
       <video
         ref={videoRef}
         autoPlay
         playsInline
         muted
         className="w-full h-full object-cover"
+        style={{ transform: 'scaleX(-1)' }}
       />
 
       {/* Oval overlay */}

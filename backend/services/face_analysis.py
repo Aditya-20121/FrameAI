@@ -43,7 +43,7 @@ Return ONLY a valid JSON object — no markdown fences, no extra text:
 {
   "face_shape": "<oval|round|square|heart|diamond|oblong>",
   "face_shape_confidence": <float 0.0-1.0>,
-  "face_shape_explanation": "<2-sentence plain English explanation referencing specific proportions visible in this photo>",
+  "face_shape_explanation": "<ONE sentence, plain English, referencing specific proportions visible in this photo>",
   "jawline": "<angular|soft|tapered>",
   "cheekbones": "<high|normal|low>",
   "eye_set": "<close|average|wide>",
@@ -89,30 +89,12 @@ Skin depth definitions (how much melanin/pigmentation):
 - deep: rich, high melanin — from brown to deep brown"""
 
 FACE_SHAPE_EXPLANATIONS = {
-    "oval": (
-        "Your face has balanced proportions with slightly wider cheekbones tapering gently "
-        "to the forehead and jaw — that's the Oval shape, the most versatile for frames."
-    ),
-    "round": (
-        "Your face is nearly as wide as it is long, with soft curves all around — "
-        "that's the Round shape. Angular frames will add great definition."
-    ),
-    "square": (
-        "Your face has a strong jaw, wide forehead, and similar width throughout — "
-        "that's the Square shape. Curved frames soften those angles beautifully."
-    ),
-    "heart": (
-        "Your face is widest at the forehead and tapers to a narrow chin — "
-        "that's the Heart shape. Bottom-weighted or rimless frames balance it perfectly."
-    ),
-    "diamond": (
-        "Your face is widest at the cheekbones, with a narrower forehead and jawline — "
-        "that's the Diamond shape. Frames with detail at the top balance your striking features."
-    ),
-    "oblong": (
-        "Your face is noticeably longer than wide, with even proportions — "
-        "that's the Oblong shape. Wide, oversized frames add beautiful horizontal presence."
-    ),
+    "oval": "Your face has balanced proportions with slightly wider cheekbones tapering gently to the forehead and jaw — the most versatile shape for frames.",
+    "round": "Your face is nearly as wide as it is long, with soft curves all around — angular frames will add great definition.",
+    "square": "Your face has a strong jaw, wide forehead, and similar width throughout — curved frames soften those angles beautifully.",
+    "heart": "Your face is widest at the forehead and tapers to a narrow chin — bottom-weighted or rimless frames balance it perfectly.",
+    "diamond": "Your face is widest at the cheekbones, with a narrower forehead and jawline — frames with detail at the top balance your striking features.",
+    "oblong": "Your face is noticeably longer than wide, with even proportions — wide, oversized frames add beautiful horizontal presence.",
 }
 
 
@@ -188,13 +170,18 @@ def validate_faces(bgr: np.ndarray) -> None:
         cascade_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
         cascade = cv2.CascadeClassifier(cascade_path)
         gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
-        faces = cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(80, 80))
+        faces = cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=6, minSize=(80, 80))
         if len(faces) == 0:
             raise ValueError("no_face_detected")
-        if len(faces) > 1:
-            raise ValueError("multiple_faces")
         h, w = bgr.shape[:2]
-        x, y, fw, fh = faces[0]
+        # Only count faces that meet the minimum size threshold to avoid false positives
+        # from small reflections, background faces, or duplicate detections.
+        significant = [(x, y, fw, fh) for (x, y, fw, fh) in faces
+                       if (fw * fh) / (w * h) >= MIN_FACE_FRACTION]
+        if len(significant) > 1:
+            raise ValueError("multiple_faces")
+        # Use the largest detected face regardless
+        x, y, fw, fh = max(faces, key=lambda f: f[2] * f[3])
         if (fw * fh) / (w * h) < MIN_FACE_FRACTION:
             raise ValueError("face_too_small")
         return
@@ -209,8 +196,15 @@ def validate_faces(bgr: np.ndarray) -> None:
 
     if not results.detections:
         raise ValueError("no_face_detected")
+    # Only raise multiple_faces if 2+ detections are both large enough to be real subjects.
     if len(results.detections) > 1:
-        raise ValueError("multiple_faces")
+        significant = [
+            d for d in results.detections
+            if (d.location_data.relative_bounding_box.width * w)
+               * (d.location_data.relative_bounding_box.height * h) / image_area >= MIN_FACE_FRACTION
+        ]
+        if len(significant) > 1:
+            raise ValueError("multiple_faces")
 
     bb = results.detections[0].location_data.relative_bounding_box
     if (bb.width * w) * (bb.height * h) / image_area < MIN_FACE_FRACTION:
