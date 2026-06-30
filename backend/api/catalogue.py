@@ -5,6 +5,7 @@ No session required.  Used by the home page.
 from fastapi import APIRouter, Query
 
 from db import client as db
+from services.storage import presign_frame_url
 
 router = APIRouter(prefix="/catalogue", tags=["catalogue"])
 
@@ -27,6 +28,8 @@ async def browse_catalogue(
         limit=limit,
         offset=offset,
     )
+    for f in frames:
+        f["product_image_url"] = presign_frame_url(f["product_image_url"])
     return {"frames": frames, "limit": limit, "offset": offset, "total": len(frames)}
 
 

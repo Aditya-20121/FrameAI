@@ -76,6 +76,16 @@ def download_object(key: str) -> bytes:
     return response["Body"].read()
 
 
+def presign_frame_url(public_url: str, expiry: int = PRESIGNED_EXPIRY_SECONDS) -> str:
+    """
+    Convert an r2.frameai.in public URL to a presigned URL.
+    Falls back to the original URL if it is not an R2 URL (e.g. already presigned).
+    Used when the R2 bucket has no public access / custom domain not yet configured.
+    """
+    key = r2_key_from_url(public_url)
+    return get_presigned_url(key, expiry) if key else public_url
+
+
 def r2_key_from_url(url: str) -> str | None:
     """
     Extract the R2 object key from a public URL.

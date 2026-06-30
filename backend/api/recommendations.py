@@ -16,6 +16,7 @@ from services.recommender import (
     get_size_band,
 )
 from db import client as db
+from services.storage import presign_frame_url
 
 router = APIRouter()
 
@@ -66,7 +67,7 @@ async def get_recommendations(
             retailer=f["retailer"],
             price_inr=f.get("price_inr"),
             buy_url=f["buy_url"],
-            product_image_url=f["product_image_url"],
+            product_image_url=presign_frame_url(f["product_image_url"]),
             vibe_tags=f.get("vibe_tags") or [],
             score=f["score"],
             explanation=f["explanation"],

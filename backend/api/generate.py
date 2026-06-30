@@ -10,7 +10,6 @@ Worker strategy:
   - Production (ENVIRONMENT=production): Celery + Redis (Upstash)
   - Development (default):               FastAPI BackgroundTasks (no worker needed)
 """
-import asyncio
 import logging
 import os
 from uuid import UUID
@@ -34,19 +33,20 @@ GENERATION_LIMIT = 3
 _IS_PROD = os.getenv("ENVIRONMENT", "development").lower() == "production"
 
 
-def _run_generation_bg(task_id: str, job_id: str, frame_id: str, session_token: str) -> None:
-    """Background function — runs in uvicorn thread pool (dev) or Celery worker (prod)."""
+async def _run_generation_bg(task_id: str, job_id: str, frame_id: str, session_token: str) -> None:
+    """Async background function — awaited by FastAPI BackgroundTasks (dev mode)."""
     db.update_generation_task(task_id, status="processing")
     try:
         frame = db.get_frame(frame_id)
         if not frame:
+            log.error("Frame %s not found for task %s", frame_id, task_id)
             db.update_generation_task(task_id, status="failed")
             return
-        r2_key = asyncio.run(gen_svc.generate_try_on(job_id, frame, task_id))
+        r2_key = await gen_svc.generate_try_on(job_id, frame, task_id)
         db.update_generation_task(task_id, status="complete", image_r2_key=r2_key)
         db.increment_generations(session_token)
-    except Exception:
-        log.exception("Generation failed for task %s", task_id)
+    except Exception as exc:
+        log.exception("Generation failed for task %s: %s", task_id, exc)
         db.update_generation_task(task_id, status="failed")
 
 
