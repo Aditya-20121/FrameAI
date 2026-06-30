@@ -102,4 +102,4 @@ async def upload_photo(
             detail={"error": "analysis_failed", "message": "Face analysis failed. Please try again."},
         )
 
-    return UploadResponse(job_id=UUID(job_id))
+    return UploadResponse(job_id=UUID(job_id), session_token=session_token)

@@ -9,6 +9,7 @@ from datetime import datetime
 class UploadResponse(BaseModel):
     job_id: UUID
     status: Literal["processing"] = "processing"
+    session_token: str  # Returned so cross-domain clients can store and send via X-Session-Token header
 
 
 class UploadError(BaseModel):

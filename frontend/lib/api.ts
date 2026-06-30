@@ -9,18 +9,38 @@ import type {
 } from './types'
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const SESSION_KEY = '_frameai_token'
+
+function getStoredToken(): string | null {
+  if (typeof window === 'undefined') return null
+  return localStorage.getItem(SESSION_KEY)
+}
+
+function storeToken(token: string): void {
+  if (typeof window !== 'undefined') localStorage.setItem(SESSION_KEY, token)
+}
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API}${path}`, { credentials: 'include', ...init })
+  const token = getStoredToken()
+  const res = await fetch(`${API}${path}`, {
+    credentials: 'include',
+    ...init,
+    headers: {
+      ...(init?.headers as Record<string, string> | undefined),
+      ...(token ? { 'X-Session-Token': token } : {}),
+    },
+  })
   const data = await res.json()
   if (!res.ok) throw data?.detail ?? data
   return data as T
 }
 
-export function uploadPhoto(file: File): Promise<UploadResponse> {
+export async function uploadPhoto(file: File): Promise<UploadResponse> {
   const form = new FormData()
   form.append('photo', file)
-  return apiFetch<UploadResponse>('/upload', { method: 'POST', body: form })
+  const result = await apiFetch<UploadResponse>('/upload', { method: 'POST', body: form })
+  if (result.session_token) storeToken(result.session_token)
+  return result
 }
 
 export function getAnalysis(jobId: string): Promise<AnalysisResponse> {
@@ -54,7 +74,7 @@ export function getCatalogue(params?: {
   offset?: number
 }): Promise<CatalogueResponse> {
   const qs = new URLSearchParams()
-  if (params?.style)   qs.set('style',   params.style)
+  if (params?.style)    qs.set('style',    params.style)
   if (params?.retailer) qs.set('retailer', params.retailer)
   qs.set('limit',  String(params?.limit  ?? 20))
   qs.set('offset', String(params?.offset ?? 0))

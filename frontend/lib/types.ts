@@ -9,6 +9,7 @@ export type SkinDepth  = 'fair' | 'light' | 'medium' | 'olive' | 'deep'
 export interface UploadResponse {
   job_id: string
   status: string
+  session_token: string  // Stored in localStorage, sent as X-Session-Token header on all subsequent requests
 }
 
 export interface AnalysisResponse {
