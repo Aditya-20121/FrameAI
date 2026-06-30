@@ -27,6 +27,7 @@ export default function CatalogueSection() {
   const [offset, setOffset] = useState(0)
   const [hasMore, setHasMore] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [fetchError, setFetchError] = useState<string | null>(null)
   const tabsRef = useRef<HTMLDivElement>(null)
 
   const LIMIT = 12
@@ -38,8 +39,9 @@ export default function CatalogueSection() {
       setFrames(prev => replace ? res.frames : [...prev, ...res.frames])
       setHasMore(res.frames.length === LIMIT)
       setOffset(newOffset + res.frames.length)
-    } catch {
-      // silently fail — catalogue is non-critical
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : JSON.stringify(err)
+      setFetchError(msg)
     } finally {
       setLoading(false)
       setLoadingMore(false)
@@ -48,6 +50,7 @@ export default function CatalogueSection() {
 
   useEffect(() => {
     setOffset(0)
+    setFetchError(null)
     fetchFrames(activeStyle, 0, true)
   }, [activeStyle])
 
@@ -85,7 +88,12 @@ export default function CatalogueSection() {
       </div>
 
       {/* Frame grid */}
-      {loading ? (
+      {fetchError ? (
+        <div className="py-8 text-center">
+          <p className="text-red-500 text-sm font-semibold mb-1">Could not load frames</p>
+          <p className="text-stone-400 text-xs font-mono break-all">{fetchError}</p>
+        </div>
+      ) : loading ? (
         <div className="grid grid-cols-2 gap-3">
           {Array.from({ length: SKELETON_COUNT }).map((_, i) => (
             <div key={i} className="bg-white rounded-2xl border border-stone-100 overflow-hidden">
@@ -133,5 +141,6 @@ export default function CatalogueSection() {
         </>
       )}
     </section>
+
   )
 }
