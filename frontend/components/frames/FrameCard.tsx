@@ -21,6 +21,7 @@ export default function FrameCard({ frame, jobId, generationsRemaining, onComple
   const [imageUrl, setImageUrl] = useState<string | null>(null)
   const [showConfirm, setShowConfirm] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [imgFailed, setImgFailed] = useState(false)
   const remainingAtClick = useRef(generationsRemaining)
 
   async function startGeneration() {
@@ -83,19 +84,24 @@ export default function FrameCard({ frame, jobId, generationsRemaining, onComple
     <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
       {/* Image area */}
       <div className="relative bg-stone-50 w-full aspect-square">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={imageUrl ?? frame.product_image_url}
-          alt={frame.name}
-          className={`w-full h-full transition-all duration-500 ${
-            imageUrl ? 'object-cover animate-fade-in' : 'object-contain p-6'
-          }`}
-          onError={e => {
-            if (e.currentTarget.src !== frame.product_image_url) {
-              e.currentTarget.src = frame.product_image_url
-            }
-          }}
-        />
+        {imgFailed && !imageUrl ? (
+          <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-stone-300">
+            <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5M3 3l18 18" />
+            </svg>
+            <p className="text-xs capitalize">{frame.style}</p>
+          </div>
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={imageUrl ?? frame.product_image_url}
+            alt={frame.name}
+            className={`w-full h-full transition-all duration-500 ${
+              imageUrl ? 'object-cover animate-fade-in' : 'object-contain p-6'
+            }`}
+            onError={() => setImgFailed(true)}
+          />
+        )}
 
         {/* Rank + retailer badges */}
         <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5">

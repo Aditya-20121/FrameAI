@@ -1,3 +1,6 @@
+'use client'
+
+import { useState } from 'react'
 import { ExternalLink } from 'lucide-react'
 import type { CatalogueFrame } from '@/lib/types'
 
@@ -15,21 +18,29 @@ const RETAILER_COLORS: Record<string, string> = {
 
 export default function FrameCatalogueCard({ frame }: Props) {
   const retailerClass = RETAILER_COLORS[frame.retailer] || 'bg-stone-100 text-stone-600'
+  const [imgFailed, setImgFailed] = useState(false)
 
   return (
     <div className="bg-white rounded-2xl border border-stone-100 overflow-hidden shadow-sm active:scale-[0.98] transition-transform">
       {/* Image */}
       <div className="relative bg-stone-50 aspect-square">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={frame.product_image_url}
-          alt={frame.name}
-          className="w-full h-full object-contain p-4"
-          loading="lazy"
-          onError={e => {
-            e.currentTarget.src = `https://placehold.co/300x300/F5F4F1/9B9B9B?text=${encodeURIComponent(frame.style)}`
-          }}
-        />
+        {imgFailed ? (
+          <div className="w-full h-full flex flex-col items-center justify-center gap-1.5 text-stone-300">
+            <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5M3 3l18 18" />
+            </svg>
+            <p className="text-xs capitalize text-stone-300">{frame.style}</p>
+          </div>
+        ) : (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={frame.product_image_url}
+            alt={frame.name}
+            className="w-full h-full object-contain p-4"
+            loading="lazy"
+            onError={() => setImgFailed(true)}
+          />
+        )}
         <span className={`absolute top-2 left-2 text-xs font-semibold px-2 py-0.5 rounded-full ${retailerClass}`}>
           {frame.retailer}
         </span>
