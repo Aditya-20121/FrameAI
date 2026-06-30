@@ -5,10 +5,17 @@ GET  /generate/{task_id} — poll status + get presigned image URL when done.
 Generation limit is server-enforced (never trust the client).
 Counter increments atomically only on successful completion.
 Failed generations do NOT count against the limit.
+
+Worker strategy:
+  - Production (ENVIRONMENT=production): Celery + Redis (Upstash)
+  - Development (default):               FastAPI BackgroundTasks (no worker needed)
 """
+import asyncio
+import logging
+import os
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 
 from api.session import require_session
 from models.schemas import (
@@ -18,17 +25,35 @@ from models.schemas import (
     GenerationStatus,
 )
 from db import client as db
-from services import storage
-from tasks.generate import generate_try_on
+from services import storage, generation as gen_svc
 
+log = logging.getLogger(__name__)
 router = APIRouter()
 
 GENERATION_LIMIT = 3
+_IS_PROD = os.getenv("ENVIRONMENT", "development").lower() == "production"
+
+
+def _run_generation_bg(task_id: str, job_id: str, frame_id: str, session_token: str) -> None:
+    """Background function — runs in uvicorn thread pool (dev) or Celery worker (prod)."""
+    db.update_generation_task(task_id, status="processing")
+    try:
+        frame = db.get_frame(frame_id)
+        if not frame:
+            db.update_generation_task(task_id, status="failed")
+            return
+        r2_key = asyncio.run(gen_svc.generate_try_on(job_id, frame, task_id))
+        db.update_generation_task(task_id, status="complete", image_r2_key=r2_key)
+        db.increment_generations(session_token)
+    except Exception:
+        log.exception("Generation failed for task %s", task_id)
+        db.update_generation_task(task_id, status="failed")
 
 
 @router.post("/generate", response_model=GenerateResponse)
 async def request_generation(
     body: GenerateRequest,
+    background_tasks: BackgroundTasks,
     session_token: str = Depends(require_session),
 ):
     # ── Guard: check generation limit ──────────────────────────────────────────
@@ -53,11 +78,19 @@ async def request_generation(
     if not db.get_frame(str(body.frame_id)):
         raise HTTPException(status_code=404, detail="Frame not found.")
 
-    # ── Create generation task row, dispatch to Celery worker ─────────────────
+    # ── Create generation task row, dispatch to worker ────────────────────────
     task_id = db.create_generation_task(
         str(body.job_id), str(body.frame_id), session_token
     )
-    generate_try_on.delay(task_id, str(body.job_id), str(body.frame_id), session_token)
+
+    if _IS_PROD:
+        from tasks.generate import generate_try_on
+        generate_try_on.delay(task_id, str(body.job_id), str(body.frame_id), session_token)
+    else:
+        # Dev: run directly in FastAPI background thread (no Celery worker needed)
+        background_tasks.add_task(
+            _run_generation_bg, task_id, str(body.job_id), str(body.frame_id), session_token
+        )
 
     return GenerateResponse(
         task_id=UUID(task_id),

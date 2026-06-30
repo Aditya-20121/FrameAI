@@ -2,12 +2,17 @@
 Session management helpers for FastAPI endpoints.
 Session token lives in an HttpOnly cookie named `_frameai_session`.
 """
+import os
 from fastapi import Cookie, Response
 
 from db import client as db
 
 COOKIE_NAME = "_frameai_session"
 COOKIE_MAX_AGE = 365 * 24 * 3600  # 1 year
+
+# On production (HTTPS) use Secure + SameSite=None for cross-origin cookies.
+# On local dev (HTTP) Secure must be False or browsers reject the cookie.
+_IS_PROD = os.getenv("ENVIRONMENT", "development").lower() == "production"
 
 
 def get_or_create_session(
@@ -30,8 +35,8 @@ def get_or_create_session(
         key=COOKIE_NAME,
         value=token,
         httponly=True,
-        samesite="lax",
-        secure=True,
+        samesite="none" if _IS_PROD else "lax",
+        secure=_IS_PROD,
         max_age=COOKIE_MAX_AGE,
     )
     return token

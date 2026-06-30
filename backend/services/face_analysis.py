@@ -24,6 +24,10 @@ from PIL import Image
 
 from config import settings
 
+# mp.solutions was removed in mediapipe 0.10.14+. Make it optional —
+# Qwen3 VL Flash handles face shape/undertone; landmark extraction is best-effort.
+_MP_SOLUTIONS = getattr(mp, 'solutions', None)
+
 # ── Landmark index constants ───────────────────────────────────────────────────
 _LM_FOREHEAD_L   = 54;   _LM_FOREHEAD_R  = 284
 _LM_CHEEK_L      = 234;  _LM_CHEEK_R     = 454
@@ -148,7 +152,24 @@ def validate_image(image_bytes: bytes) -> np.ndarray:
 
 
 def validate_faces(bgr: np.ndarray) -> None:
-    mp_fd = mp.solutions.face_detection
+    if _MP_SOLUTIONS is None:
+        # solutions API unavailable (mediapipe ≥ 0.10.14).
+        # Fall back to OpenCV Haar cascade for basic face presence check.
+        cascade_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+        cascade = cv2.CascadeClassifier(cascade_path)
+        gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
+        faces = cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(80, 80))
+        if len(faces) == 0:
+            raise ValueError("no_face_detected")
+        if len(faces) > 1:
+            raise ValueError("multiple_faces")
+        h, w = bgr.shape[:2]
+        x, y, fw, fh = faces[0]
+        if (fw * fh) / (w * h) < MIN_FACE_FRACTION:
+            raise ValueError("face_too_small")
+        return
+
+    mp_fd = _MP_SOLUTIONS.face_detection
     h, w = bgr.shape[:2]
     image_area = h * w
     rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
@@ -169,7 +190,11 @@ def validate_faces(bgr: np.ndarray) -> None:
 # ── Landmark extraction + IPD ──────────────────────────────────────────────────
 
 def extract_landmarks(bgr: np.ndarray):
-    mp_fm = mp.solutions.face_mesh
+    """Returns face landmarks, or None if mp.solutions is unavailable."""
+    if _MP_SOLUTIONS is None:
+        return None
+
+    mp_fm = _MP_SOLUTIONS.face_mesh
     rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
 
     with mp_fm.FaceMesh(
@@ -283,9 +308,15 @@ async def run_face_analysis(image_bytes: bytes) -> AnalysisResult:
 
     h, w = bgr.shape[:2]
     landmarks = extract_landmarks(bgr)
-    geometry = compute_geometry(landmarks, w, h)
-    ipd_mm = compute_ipd_mm(geometry)
-    size_band = get_size_band(ipd_mm)
+
+    if landmarks is not None:
+        geometry  = compute_geometry(landmarks, w, h)
+        ipd_mm    = compute_ipd_mm(geometry)
+        size_band = get_size_band(ipd_mm)
+    else:
+        geometry  = None
+        ipd_mm    = 63.0   # average adult IPD
+        size_band = "standard"
 
     # Defaults (used if Qwen fails)
     face_shape = "oval";  confidence = 0.80
@@ -306,7 +337,8 @@ async def run_face_analysis(image_bytes: bytes) -> AnalysisResult:
         undertone_hex  = q.get("undertone_hex", "#C8956C")
 
     except Exception:
-        face_shape, confidence = _classify_geometric(geometry)
+        if geometry is not None:
+            face_shape, confidence = _classify_geometric(geometry)
         explanation = FACE_SHAPE_EXPLANATIONS[face_shape]
 
     return AnalysisResult(
@@ -318,5 +350,5 @@ async def run_face_analysis(image_bytes: bytes) -> AnalysisResult:
         undertone_hex=undertone_hex,
         ipd_mm=ipd_mm,
         size_band=size_band,
-        landmarks=landmarks,
+        landmarks=list(landmarks) if landmarks is not None else [],
     )
