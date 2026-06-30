@@ -41,16 +41,14 @@ def upload_photo(job_id: str, image_bytes: bytes, content_type: str) -> str:
 
 
 def upload_generated_image(task_id: str, image_bytes: bytes) -> str:
-    """Upload a generated portrait image. Returns the R2 object key."""
+    """Upload a generated portrait image. Returns the R2 object key.
+    No expiry — images are kept permanently for developer quality review."""
     key = f"generated/{task_id}.webp"
-    expires_at = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
-
     _r2().put_object(
         Bucket=settings.r2_bucket_name,
         Key=key,
         Body=image_bytes,
         ContentType="image/webp",
-        Metadata={"expires_at": expires_at},
     )
     return key
 

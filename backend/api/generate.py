@@ -44,7 +44,14 @@ async def _run_generation_bg(task_id: str, job_id: str, frame_id: str, session_t
             db.update_generation_task(task_id, status="failed")
             return
         r2_key = await gen_svc.generate_try_on(job_id, frame, task_id)
-        db.update_generation_task(task_id, status="complete", image_r2_key=r2_key)
+        from config import settings as _settings
+        image_url = f"{_settings.r2_public_domain}/{r2_key}"
+        db.update_generation_task(
+            task_id,
+            status="complete",
+            image_r2_key=r2_key,
+            generated_image_url=image_url,
+        )
         db.increment_generations(session_token)
     except Exception as exc:
         log.exception("Generation failed for task %s: %s", task_id, exc)

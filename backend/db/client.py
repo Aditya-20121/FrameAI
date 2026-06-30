@@ -149,11 +149,14 @@ def update_generation_task(
     *,
     status: str,
     image_r2_key: str | None = None,
+    generated_image_url: str | None = None,
     fal_request_id: str | None = None,
 ) -> None:
     payload: dict = {"status": status}
     if image_r2_key:
         payload["image_r2_key"] = image_r2_key
+    if generated_image_url:
+        payload["generated_image_url"] = generated_image_url
     if fal_request_id:
         payload["fal_request_id"] = fal_request_id
     if status == "complete":
