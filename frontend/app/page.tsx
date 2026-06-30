@@ -125,7 +125,7 @@ export default function Home() {
       </div>
 
       {/* ── Footer ─────────────────────────────────────────────────── */}
-      <footer className="pb-28 sm:pb-8 mt-auto border-t border-stone-100 bg-white">
+      <footer className="mt-auto border-t border-stone-100 bg-white">
         <div className="max-w-2xl mx-auto px-4 py-6 flex flex-col sm:flex-row items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <div className="w-5 h-5 bg-amber-500 rounded-md flex items-center justify-center">
@@ -145,18 +145,6 @@ export default function Home() {
         </div>
       </footer>
 
-      {/* ── Sticky mobile CTA ──────────────────────────────────────── */}
-      <div className="fixed bottom-0 left-0 right-0 sm:hidden z-40">
-        <div className="bg-white/95 backdrop-blur-sm border-t border-stone-100 px-4 pt-3 pb-5">
-          <Link
-            href="/analyse"
-            className="flex items-center justify-center gap-2 w-full bg-amber-500 text-white font-bold text-base py-4 rounded-2xl active:scale-[0.98] transition-transform shadow-lg shadow-amber-200"
-          >
-            Analyse My Face — Free
-            <ArrowRight className="w-4 h-4" />
-          </Link>
-        </div>
-      </div>
 
     </div>
   )
