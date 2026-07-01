@@ -60,10 +60,11 @@ export default function AnalysisPage() {
     )
   }
 
-  const isComplete = analysis?.status === 'complete'
-  const faceShape  = analysis?.face_shape
-  const undertone  = analysis?.undertone
-  const sizeBand   = analysis?.size_band
+  const isComplete      = analysis?.status === 'complete'
+  const faceShape       = analysis?.face_shape
+  const faceShapeLabel  = analysis?.face_shape_label ?? (faceShape ? SHAPE_LABELS[faceShape] : undefined)
+  const undertone       = analysis?.undertone
+  const sizeBand        = analysis?.size_band
 
   return (
     <main className="min-h-screen bg-stone-50">
@@ -121,7 +122,7 @@ export default function AnalysisPage() {
                 </p>
                 <div className="flex items-baseline gap-3 flex-wrap">
                   <h1 className="text-3xl font-extrabold text-stone-900 tracking-tight">
-                    {SHAPE_LABELS[faceShape]} face
+                    {faceShapeLabel} face
                   </h1>
                   <div className="flex items-center gap-2 text-stone-400 text-sm">
                     {undertone && (

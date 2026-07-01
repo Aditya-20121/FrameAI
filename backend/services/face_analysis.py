@@ -26,7 +26,8 @@ ANALYSIS_PROMPT = """Look at this portrait photo and analyse the person's face u
 Return ONLY a valid JSON object — no markdown fences, no extra text:
 
 {
-  "face_shape": "<oval|round|square|heart|diamond|oblong>",
+  "face_shape": "<nuanced display label — e.g. 'Oval', 'Oval (leaning towards Square)', 'Square (strong jaw, slightly rounded)', 'Round', 'Heart (wide forehead)', 'Diamond', 'Oblong' — be specific about the nuance, do not restrict to one word if the face sits between two categories>",
+  "face_shape_primary": "<oval|round|square|heart|diamond|oblong — the single closest primary category>",
   "face_shape_confidence": <float 0.0-1.0>,
   "face_shape_explanation": "<ONE sentence, plain English, referencing specific proportions visible in this photo>",
   "jawline": "<angular|soft|tapered>",
@@ -40,21 +41,23 @@ Return ONLY a valid JSON object — no markdown fences, no extra text:
 
 Face shape definitions:
 - oval: balanced proportions, slightly wider cheekbones, gentle taper at forehead and jaw
-- round: nearly as wide as long, soft curves, full cheeks
-- square: strong angular jaw, similar width from forehead to jaw
-- heart: wide forehead, narrow pointed chin
-- diamond: narrow forehead AND narrow jaw, wide prominent cheekbones
-- oblong: significantly longer than wide, even proportions top to bottom
+- round: nearly as wide as long, soft curves, full cheeks, short face height
+- square: strong angular jaw corners clearly visible from the front, similar width from forehead to jaw
+- heart: wide forehead, narrow pointed chin, jaw significantly narrower than forehead
+- diamond: narrow forehead AND narrow jaw, wide prominent cheekbones are the widest point
+- oblong: significantly longer than wide, relatively even proportions from forehead to jaw
 
-Jawline definitions:
-- angular: sharp, clearly defined jaw with visible angles at the corners
-- soft: rounded, curved jaw — no sharp angles
-- tapered: jaw gradually and evenly narrows toward the chin
+If a face clearly sits between two categories, use a compound label in "face_shape" (e.g. "Oval (leaning towards Square)") but still pick the single best match for "face_shape_primary".
+
+Jawline definitions — look at the jaw corners when viewed straight on:
+- angular: jaw corners are visibly wide and form distinct right angles; the jaw maintains lateral width before dropping to the chin — structured, defined look typical of square or strong oval faces
+- soft: jaw curves smoothly with no distinct corners; blends gradually from cheek to chin with no visible angles — rounded and gentle, typical of round faces
+- tapered: jaw gradually narrows in a V-shape toward the chin; no distinct lateral corners, just a gradual inward slope — typical of heart, diamond, or oval faces
 
 Cheekbone definitions:
 - high: prominent, visible bone structure clearly above the midface
 - normal: average prominence, not a defining feature
-- low: cheekbones sit below the midface, not prominent
+- low: cheekbones sit at or below the midface, not prominent
 
 Eye set definitions:
 - close: eyes appear close to the nose bridge, narrow inner canthal distance
@@ -62,12 +65,12 @@ Eye set definitions:
 - wide: noticeable gap between the eyes relative to face width
 
 Skin undertone (constant — does not change with sun exposure):
-- warm: golden, yellow, peachy, or olive base tones
-- cool: pink, rosy, reddish, or bluish-pink base tones
-- neutral: balanced beige — mix of warm and cool
+- warm: golden, yellow, peachy, or olive base tones visible in the skin
+- cool: pink, rosy, reddish, or bluish-pink base tones visible in the skin
+- neutral: balanced beige — an even mix of warm and cool, no dominant cast
 
 Skin depth:
-- fair: very light, minimal melanin
+- fair: very light, minimal melanin — pale or porcelain
 - light: light skin with slightly more pigmentation than fair
 - medium: middle range — golden to light brown tones
 - olive: medium depth with a yellow-green cast
@@ -85,7 +88,8 @@ FACE_SHAPE_EXPLANATIONS = {
 
 @dataclass
 class AnalysisResult:
-    face_shape: str
+    face_shape: str        # primary enum: oval | round | square | heart | diamond | oblong
+    face_shape_label: str  # nuanced display label: "Oval (leaning towards Square)"
     face_shape_confidence: float
     face_shape_explanation: str
     jawline: str
@@ -192,6 +196,22 @@ _VALID_EYE_SET    = {"close", "average", "wide"}
 _VALID_SKIN_DEPTH = {"fair", "light", "medium", "olive", "deep"}
 
 
+def _extract_primary_shape(label: str) -> str:
+    """Extract the primary shape enum from a nuanced label like 'Oval (leaning towards Square)'.
+    Takes the leftmost matching shape word — the primary shape is always named first in the label.
+    Uses word boundaries so 'round' does not match inside 'rounded'."""
+    import re
+    lower = label.lower()
+    best_pos   = len(lower) + 1
+    best_shape = "oval"
+    for shape in _VALID_SHAPES:
+        m = re.search(r"\b" + shape + r"\b", lower)
+        if m and m.start() < best_pos:
+            best_pos   = m.start()
+            best_shape = shape
+    return best_shape
+
+
 # ── Top-level entry point ──────────────────────────────────────────────────────
 
 async def run_face_analysis(image_bytes: bytes) -> AnalysisResult:
@@ -204,14 +224,24 @@ async def run_face_analysis(image_bytes: bytes) -> AnalysisResult:
     """
     q = await _call_gemini_vision(image_bytes)
 
-    fs = q.get("face_shape", "").lower().strip()
+    # face_shape is the nuanced display label ("Oval (leaning towards Square)")
+    # face_shape_primary is the strict enum for DB/logic ("oval")
+    face_shape_label = q.get("face_shape", "").strip()
+    fs_primary       = q.get("face_shape_primary", "").lower().strip()
+    face_shape       = fs_primary if fs_primary in _VALID_SHAPES else _extract_primary_shape(face_shape_label)
+
+    # Normalise label casing — capitalise first word, preserve the rest
+    if face_shape_label:
+        face_shape_label = face_shape_label[0].upper() + face_shape_label[1:]
+    else:
+        face_shape_label = face_shape.capitalize()
+
     ut = q.get("undertone",  "").lower().strip()
     jl = q.get("jawline",    "").lower().strip()
     cb = q.get("cheekbones", "").lower().strip()
     es = q.get("eye_set",    "").lower().strip()
     sd = q.get("skin_depth", "").lower().strip()
 
-    face_shape     = fs if fs in _VALID_SHAPES     else "oval"
     undertone      = ut if ut in _VALID_TONES      else "neutral"
     jawline        = jl if jl in _VALID_JAWLINES   else "soft"
     cheekbones     = cb if cb in _VALID_CHEEKBONES else "normal"
@@ -225,6 +255,7 @@ async def run_face_analysis(image_bytes: bytes) -> AnalysisResult:
 
     return AnalysisResult(
         face_shape=face_shape,
+        face_shape_label=face_shape_label,
         face_shape_confidence=round(confidence, 3),
         face_shape_explanation=explanation,
         jawline=jawline,

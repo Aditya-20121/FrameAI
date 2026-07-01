@@ -42,6 +42,7 @@ async def get_analysis(
         job_id=job_id,
         status="complete",
         face_shape=job["face_shape"],
+        face_shape_label=ff.get("face_shape_label"),
         face_shape_confidence=job["face_shape_conf"],
         face_shape_explanation=ff.get("face_shape_explanation") or _shape_explanation(job["face_shape"]),
         jawline=ff.get("jawline"),

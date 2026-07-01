@@ -91,6 +91,7 @@ async def upload_photo(
                 "eye_set": result.eye_set,
                 "skin_depth": result.skin_depth,
                 "face_shape_explanation": result.face_shape_explanation,
+                "face_shape_label": result.face_shape_label,
             },
         )
     except Exception:

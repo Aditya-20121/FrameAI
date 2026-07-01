@@ -16,6 +16,7 @@ export interface AnalysisResponse {
   job_id: string
   status: 'processing' | 'complete' | 'failed'
   face_shape?: FaceShape
+  face_shape_label?: string   // nuanced display: "Oval (leaning towards Square)"
   face_shape_confidence?: number
   face_shape_explanation?: string
   jawline?: Jawline

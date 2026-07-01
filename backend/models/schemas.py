@@ -32,6 +32,7 @@ class AnalysisResult(BaseModel):
     job_id: UUID
     status: Literal["complete", "processing", "failed"]
     face_shape: FaceShape | None = None
+    face_shape_label: str | None = None  # nuanced display: "Oval (leaning towards Square)"
     face_shape_confidence: float | None = Field(None, ge=0.0, le=1.0)
     face_shape_explanation: str | None = None
     jawline: Jawline | None = None
