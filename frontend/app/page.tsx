@@ -195,9 +195,15 @@ export default function Home() {
               Frames sourced from Lenskart & John Jacobs India.
               Affiliate links keep this free.
             </p>
-            <Link href="/privacy" className="text-stone-400 text-xs underline underline-offset-2 hover:text-stone-600 transition-colors">
-              Privacy Policy
-            </Link>
+            <div className="flex items-center gap-3">
+              <Link href="/privacy" className="text-stone-400 text-xs underline underline-offset-2 hover:text-stone-600 transition-colors">
+                Privacy Policy
+              </Link>
+              <span className="text-stone-200 text-xs">·</span>
+              <Link href="/terms" className="text-stone-400 text-xs underline underline-offset-2 hover:text-stone-600 transition-colors">
+                Terms &amp; Conditions
+              </Link>
+            </div>
           </div>
         </div>
       </footer>
