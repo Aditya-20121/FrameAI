@@ -180,10 +180,6 @@ def validate_faces(bgr: np.ndarray) -> None:
                        if (fw * fh) / (w * h) >= MIN_FACE_FRACTION]
         if len(significant) > 1:
             raise ValueError("multiple_faces")
-        # Use the largest detected face regardless
-        x, y, fw, fh = max(faces, key=lambda f: f[2] * f[3])
-        if (fw * fh) / (w * h) < MIN_FACE_FRACTION:
-            raise ValueError("face_too_small")
         return
 
     mp_fd = _MP_SOLUTIONS.face_detection
@@ -206,9 +202,7 @@ def validate_faces(bgr: np.ndarray) -> None:
         if len(significant) > 1:
             raise ValueError("multiple_faces")
 
-    bb = results.detections[0].location_data.relative_bounding_box
-    if (bb.width * w) * (bb.height * h) / image_area < MIN_FACE_FRACTION:
-        raise ValueError("face_too_small")
+    # face_too_small check removed — analysis proceeds regardless of face size
 
 
 # ── Landmark extraction + IPD ──────────────────────────────────────────────────
