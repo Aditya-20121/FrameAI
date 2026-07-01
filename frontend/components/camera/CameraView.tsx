@@ -144,7 +144,15 @@ export default function CameraView({ onCapture, onSwitchToUpload, onNoCameraAvai
     canvas.width = video.videoWidth
     canvas.height = video.videoHeight
     canvas.getContext('2d')!.drawImage(video, 0, 0)
-    canvas.toBlob(blob => { if (blob) onCapture(blob) }, 'image/webp', 0.92)
+    // Try WebP first; fall back to JPEG on older iOS where WebP canvas encoding is unsupported
+    canvas.toBlob(blob => {
+      if (blob) { onCapture(blob); return }
+      canvas.toBlob(jpegBlob => {
+        if (jpegBlob) { onCapture(jpegBlob); return }
+        // Both failed — reset so user can try again
+        capturedRef.current = false
+      }, 'image/jpeg', 0.92)
+    }, 'image/webp', 0.92)
   }, [disabled, onCapture])
 
   if (cameraError) {

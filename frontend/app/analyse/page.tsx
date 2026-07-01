@@ -24,7 +24,7 @@ export default function AnalysePage() {
       const file =
         fileOrBlob instanceof File
           ? fileOrBlob
-          : new File([fileOrBlob], 'selfie.webp', { type: 'image/webp' })
+          : new File([fileOrBlob], 'selfie', { type: fileOrBlob.type || 'image/webp' })
       const result = await uploadPhoto(file)
       router.push(`/analysis/${result.job_id}`)
     } catch (err: unknown) {
