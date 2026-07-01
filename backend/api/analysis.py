@@ -52,7 +52,6 @@ async def get_analysis(
         undertone_confidence=job["undertone_conf"],
         undertone_hex=job["undertone_hex"],
         skin_depth=ff.get("skin_depth"),
-        ipd_mm=job["ipd_mm"],
         size_band=job["size_band"],
     )
 

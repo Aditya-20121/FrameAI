@@ -36,7 +36,8 @@ Return ONLY a valid JSON object — no markdown fences, no extra text:
   "undertone": "<warm|cool|neutral>",
   "undertone_confidence": <float 0.0-1.0>,
   "undertone_hex": "<#RRGGBB approximation of the person's skin tone>",
-  "skin_depth": "<fair|light|medium|olive|deep>"
+  "skin_depth": "<fair|light|medium|olive|deep>",
+  "size_band": "<narrow|standard|wide — estimate frame size needed based on the distance between the inner eye corners relative to the total face width: narrow if eyes are close-set, wide if eyes are far apart, standard otherwise>"
 }
 
 Face shape definitions:
@@ -241,12 +242,14 @@ async def run_face_analysis(image_bytes: bytes) -> AnalysisResult:
     cb = q.get("cheekbones", "").lower().strip()
     es = q.get("eye_set",    "").lower().strip()
     sd = q.get("skin_depth", "").lower().strip()
+    sb = q.get("size_band",  "").lower().strip()
 
     undertone      = ut if ut in _VALID_TONES      else "neutral"
     jawline        = jl if jl in _VALID_JAWLINES   else "soft"
     cheekbones     = cb if cb in _VALID_CHEEKBONES else "normal"
     eye_set        = es if es in _VALID_EYE_SET    else "average"
     skin_depth     = sd if sd in _VALID_SKIN_DEPTH else "medium"
+    size_band      = sb if sb in {"narrow", "standard", "wide"} else "standard"
 
     confidence     = float(q.get("face_shape_confidence", 0.85))
     explanation    = q.get("face_shape_explanation") or FACE_SHAPE_EXPLANATIONS[face_shape]
@@ -265,7 +268,7 @@ async def run_face_analysis(image_bytes: bytes) -> AnalysisResult:
         undertone_confidence=round(undertone_conf, 3),
         undertone_hex=undertone_hex,
         skin_depth=skin_depth,
-        ipd_mm=63.0,    # IPD removed (was MediaPipe-only); default adult average
-        size_band="standard",
+        ipd_mm=0.0,     # not computed — retained only for DB schema compat
+        size_band=size_band,
         landmarks=[],
     )

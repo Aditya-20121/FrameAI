@@ -42,7 +42,6 @@ class AnalysisResult(BaseModel):
     undertone_confidence: float | None = Field(None, ge=0.0, le=1.0)
     undertone_hex: str | None = None
     skin_depth: SkinDepth | None = None
-    ipd_mm: float | None = None
     size_band: SizeBand | None = None
 
 

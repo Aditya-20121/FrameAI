@@ -104,7 +104,7 @@ export default function AnalysisCard({ analysis }: Props) {
     face_shape, face_shape_confidence, face_shape_explanation,
     jawline, cheekbones, eye_set,
     undertone, undertone_hex, skin_depth,
-    ipd_mm, size_band,
+    size_band,
   } = analysis
 
   const guide = deriveStyleGuide(analysis)
@@ -258,24 +258,14 @@ export default function AnalysisCard({ analysis }: Props) {
         )}
 
         {/* ── 4. FRAME SIZE ─────────────────────────────────────── */}
-        {(ipd_mm || size_band) && (
+        {size_band && (
           <>
             <Divider />
             <div>
               <SectionTitle>Frame Size</SectionTitle>
 
               <div className="flex items-start justify-between mb-3">
-                <div>
-                  {ipd_mm && (
-                    <>
-                      <p className="text-2xl font-bold text-stone-900">
-                        {ipd_mm.toFixed(1)}
-                        <span className="text-sm font-normal text-stone-400 ml-1">mm</span>
-                      </p>
-                      <p className="text-xs text-stone-400 mt-0.5">Pupillary distance (IPD)</p>
-                    </>
-                  )}
-                </div>
+                <div />
                 {guide && (
                   <span className="bg-stone-100 text-stone-600 text-sm font-semibold px-3 py-1.5 rounded-full">
                     {guide.sizeLabel}

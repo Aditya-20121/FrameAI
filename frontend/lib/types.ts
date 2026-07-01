@@ -26,7 +26,6 @@ export interface AnalysisResponse {
   undertone_confidence?: number
   undertone_hex?: string
   skin_depth?: SkinDepth
-  ipd_mm?: number
   size_band?: SizeBand
 }
 
