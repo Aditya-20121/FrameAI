@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { ExternalLink, ShoppingBag } from 'lucide-react'
-import type { Frame } from '@/lib/types'
+import { ExternalLink, ShoppingBag, ChevronLeft, ChevronRight } from 'lucide-react'
+import type { CatalogueFrame } from '@/lib/types'
 import { postGenerate, getGenerateStatus } from '@/lib/api'
 import GenerationModal from './GenerationModal'
 import QuoteLoader from '@/components/ui/QuoteLoader'
@@ -10,19 +10,21 @@ import QuoteLoader from '@/components/ui/QuoteLoader'
 type GenStatus = 'idle' | 'generating' | 'complete' | 'failed'
 
 type Props = {
-  frame: Frame
+  frame: CatalogueFrame
   jobId: string
   generationsRemaining: number
   onComplete: (newRemaining: number) => void
 }
 
 export default function FrameCard({ frame, jobId, generationsRemaining, onComplete }: Props) {
-  const [status, setStatus]       = useState<GenStatus>('idle')
-  const [imageUrl, setImageUrl]   = useState<string | null>(null)
+  const [status, setStatus]           = useState<GenStatus>('idle')
+  const [imageUrl, setImageUrl]       = useState<string | null>(null)
   const [showConfirm, setShowConfirm] = useState(false)
-  const [error, setError]         = useState<string | null>(null)
-  const [imgFailed, setImgFailed] = useState(false)
-  const remainingAtClick          = useRef(generationsRemaining)
+  const [error, setError]             = useState<string | null>(null)
+  const [imgFailed, setImgFailed]     = useState(false)
+  const [activeSlide, setActiveSlide] = useState(0)
+  const scrollRef                     = useRef<HTMLDivElement>(null)
+  const remainingAtClick              = useRef(generationsRemaining)
 
   async function startGeneration() {
     remainingAtClick.current = generationsRemaining
@@ -52,6 +54,7 @@ export default function FrameCard({ frame, jobId, generationsRemaining, onComple
       if (res.status === 'complete' && res.image_url) {
         setImageUrl(res.image_url)
         setStatus('complete')
+        setActiveSlide(0)
         return
       }
       if (res.status === 'failed') {
@@ -61,8 +64,14 @@ export default function FrameCard({ frame, jobId, generationsRemaining, onComple
     throw { message: 'Generation timed out. This try was not counted — you can retry.' }
   }
 
+  function scrollTo(index: number) {
+    scrollRef.current?.scrollTo({ left: index * scrollRef.current.offsetWidth, behavior: 'smooth' })
+    setActiveSlide(index)
+  }
+
   const canTryOn     = generationsRemaining > 0 && (status === 'idle' || status === 'failed')
   const isGenerating = status === 'generating'
+  const showComparison = status === 'complete' && !!imageUrl
 
   const RETAILER_COLORS: Record<string, string> = {
     'Lenskart':    'bg-teal-50 text-teal-700',
@@ -75,60 +84,120 @@ export default function FrameCard({ frame, jobId, generationsRemaining, onComple
   return (
     <div className="bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
 
-      {/* ── Image ────────────────────────────────────────────────── */}
-      <div className="relative bg-stone-50 w-full aspect-square">
-        {imgFailed && !imageUrl ? (
-          <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-stone-300">
-            <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5M3 3l18 18" />
-            </svg>
-            <p className="text-xs capitalize">{frame.style}</p>
-          </div>
-        ) : (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={imageUrl ?? frame.product_image_url}
-            alt={frame.name}
-            className={`w-full h-full transition-all duration-500 ${
-              imageUrl ? 'object-cover animate-fade-in' : 'object-contain p-6'
-            }`}
-            onError={() => setImgFailed(true)}
-          />
-        )}
+      {/* ── Image area ───────────────────────────────────────────── */}
+      {showComparison ? (
+        // Horizontal snap-scroll: [Try-On] [Frame]
+        <div className="relative">
+          <div
+            ref={scrollRef}
+            className="flex overflow-x-auto snap-x snap-mandatory scrollbar-none"
+            style={{ scrollbarWidth: 'none' }}
+            onScroll={e => {
+              const el = e.currentTarget
+              setActiveSlide(Math.round(el.scrollLeft / el.offsetWidth))
+            }}
+          >
+            {/* Slide 1 — generated try-on */}
+            <div className="w-full flex-shrink-0 snap-center relative aspect-square bg-stone-900">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={imageUrl!}
+                alt={`${frame.name} try-on`}
+                className="w-full h-full object-cover"
+              />
+              <span className="absolute bottom-2.5 left-2.5 bg-green-500 text-white text-xs font-bold px-2.5 py-1 rounded-full">
+                AI Try-On
+              </span>
+            </div>
 
-        {/* Top-left: rank */}
-        <div className="absolute top-2.5 left-2.5">
-          <span className="bg-stone-900/70 backdrop-blur-sm text-white text-xs font-bold px-2 py-0.5 rounded-full">
-            #{frame.rank}
-          </span>
+            {/* Slide 2 — original frame */}
+            <div className="w-full flex-shrink-0 snap-center relative aspect-square bg-stone-50">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={frame.product_image_url}
+                alt={frame.name}
+                className="w-full h-full object-contain p-6"
+              />
+              <span className="absolute bottom-2.5 left-2.5 bg-stone-700/70 text-white text-xs font-bold px-2.5 py-1 rounded-full">
+                Frame
+              </span>
+            </div>
+          </div>
+
+          {/* Prev / next arrows */}
+          {activeSlide === 0 ? (
+            <button
+              onClick={() => scrollTo(1)}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40
+                         backdrop-blur-sm flex items-center justify-center text-white"
+              aria-label="See frame"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          ) : (
+            <button
+              onClick={() => scrollTo(0)}
+              className="absolute left-2.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40
+                         backdrop-blur-sm flex items-center justify-center text-white"
+              aria-label="See try-on"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+          )}
+
+          {/* Dot indicators */}
+          <div className="absolute bottom-2.5 right-2.5 flex gap-1">
+            {[0, 1].map(i => (
+              <button
+                key={i}
+                onClick={() => scrollTo(i)}
+                className={`w-1.5 h-1.5 rounded-full transition-colors ${
+                  activeSlide === i ? 'bg-white' : 'bg-white/40'
+                }`}
+              />
+            ))}
+          </div>
+
+          {/* Swipe hint — fades after first interaction */}
+          {activeSlide === 0 && (
+            <div className="absolute top-2.5 right-2.5 bg-black/40 backdrop-blur-sm text-white text-[10px]
+                            font-medium px-2 py-1 rounded-full pointer-events-none">
+              Swipe to compare
+            </div>
+          )}
         </div>
+      ) : (
+        // Single frame image
+        <div className="relative bg-stone-50 w-full aspect-square">
+          {imgFailed ? (
+            <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-stone-300">
+              <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5M3 3l18 18" />
+              </svg>
+              <p className="text-xs capitalize">{frame.style}</p>
+            </div>
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={frame.product_image_url}
+              alt={frame.name}
+              className="w-full h-full object-contain p-6"
+              onError={() => setImgFailed(true)}
+            />
+          )}
 
-        {/* Top-right: match % badge */}
-        <div className="absolute top-2.5 right-2.5">
-          <span className="bg-amber-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-            {Math.round(frame.score)}% match
-          </span>
+          {/* Generation loading overlay */}
+          {isGenerating && (
+            <div className="absolute inset-0 bg-white/90 backdrop-blur-sm flex items-center justify-center">
+              <QuoteLoader category="tryon" estimatedSeconds={20} />
+            </div>
+          )}
         </div>
-
-        {/* Generation overlay */}
-        {isGenerating && (
-          <div className="absolute inset-0 bg-white/90 backdrop-blur-sm flex items-center justify-center">
-            <QuoteLoader category="tryon" estimatedSeconds={20} />
-          </div>
-        )}
-
-        {/* Try-on complete overlay badge */}
-        {status === 'complete' && imageUrl && (
-          <div className="absolute bottom-2.5 left-2.5 bg-green-500 text-white text-xs font-bold px-2.5 py-1 rounded-full">
-            AI Try-On
-          </div>
-        )}
-      </div>
+      )}
 
       {/* ── Info ─────────────────────────────────────────────────── */}
       <div className="p-4">
 
-        {/* Name + price */}
         <div className="flex items-start justify-between gap-2 mb-1">
           <p className="text-stone-900 font-semibold text-sm leading-snug flex-1">{frame.name}</p>
           {frame.price_inr != null && (
@@ -138,24 +207,14 @@ export default function FrameCard({ frame, jobId, generationsRemaining, onComple
           )}
         </div>
 
-        {/* Style · colour · material */}
         <p className="text-stone-400 text-xs mb-1.5 capitalize">
           {[frame.style, frame.colour, frame.material].filter(Boolean).join(' · ')}
         </p>
 
-        {/* Retailer pill */}
         <span className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full mb-3 ${retailerClass}`}>
           {frame.retailer}
         </span>
 
-        {/* Why this frame */}
-        {frame.explanation && (
-          <p className="text-stone-500 text-xs leading-relaxed line-clamp-2 mb-3">
-            {frame.explanation}
-          </p>
-        )}
-
-        {/* Error */}
         {error && (
           <p className="text-red-500 text-xs mb-3 leading-relaxed">{error}</p>
         )}
@@ -164,19 +223,21 @@ export default function FrameCard({ frame, jobId, generationsRemaining, onComple
         <div className="flex gap-2">
           <button
             onClick={() => canTryOn && setShowConfirm(true)}
-            disabled={!canTryOn || isGenerating}
+            disabled={!canTryOn && !showComparison}
             className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all active:scale-[0.97]
               ${canTryOn && !isGenerating
                 ? 'bg-amber-500 text-white shadow-md shadow-amber-100'
-                : status === 'complete'
+                : showComparison
                   ? 'bg-green-50 border border-green-200 text-green-600 cursor-default'
-                  : 'bg-stone-100 text-stone-400 cursor-not-allowed'
+                  : isGenerating
+                    ? 'bg-stone-100 text-stone-400'
+                    : 'bg-stone-100 text-stone-400 cursor-not-allowed'
               }`}
           >
             {isGenerating
               ? 'Generating…'
-              : status === 'complete'
-                ? 'Try-on complete'
+              : showComparison
+                ? 'Try-on complete ✓'
                 : status === 'failed'
                   ? 'Retry'
                   : generationsRemaining === 0

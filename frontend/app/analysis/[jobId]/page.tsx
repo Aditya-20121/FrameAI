@@ -4,10 +4,10 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, RotateCcw } from 'lucide-react'
-import { getAnalysis, getRecommendations, getSession } from '@/lib/api'
-import type { AnalysisResponse, RecommendationsResponse, SessionResponse } from '@/lib/types'
+import { getAnalysis, getSession } from '@/lib/api'
+import type { AnalysisResponse, SessionResponse } from '@/lib/types'
 import AnalysisCard from '@/components/analysis/AnalysisCard'
-import FrameGrid from '@/components/frames/FrameGrid'
+import TryOnCatalogueSection from '@/components/frames/TryOnCatalogueSection'
 
 const SHAPE_LABELS: Record<string, string> = {
   oval: 'Oval', round: 'Round', square: 'Square',
@@ -20,13 +20,11 @@ const UNDERTONE_LABELS: Record<string, string> = {
 export default function AnalysisPage() {
   const params = useParams()
   const router = useRouter()
-  const jobId = params.jobId as string
+  const jobId  = params.jobId as string
 
-  const [analysis, setAnalysis]             = useState<AnalysisResponse | null>(null)
-  const [recommendations, setRecommendations] = useState<RecommendationsResponse | null>(null)
-  const [session, setSession]               = useState<SessionResponse | null>(null)
-  const [recsError, setRecsError]           = useState<string | null>(null)
-  const [analysisError, setAnalysisError]   = useState<string | null>(null)
+  const [analysis, setAnalysis]         = useState<AnalysisResponse | null>(null)
+  const [session, setSession]           = useState<SessionResponse | null>(null)
+  const [analysisError, setAnalysisError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -39,17 +37,9 @@ export default function AnalysisPage() {
 
         if (result.status === 'complete') {
           try {
-            const [recs, sess] = await Promise.all([
-              getRecommendations(jobId),
-              getSession(),
-            ])
-            if (!cancelled) {
-              setRecommendations(recs)
-              setSession(sess)
-            }
-          } catch {
-            if (!cancelled) setRecsError('Could not load recommendations. Please refresh.')
-          }
+            const sess = await getSession()
+            if (!cancelled) setSession(sess)
+          } catch { /* session fetch failing is non-fatal */ }
         } else if (result.status === 'processing') {
           setTimeout(poll, 1200)
         } else {
@@ -70,10 +60,10 @@ export default function AnalysisPage() {
     )
   }
 
-  const isComplete   = analysis?.status === 'complete'
-  const faceShape    = analysis?.face_shape
-  const undertone    = analysis?.undertone
-  const sizeBand     = analysis?.size_band
+  const isComplete = analysis?.status === 'complete'
+  const faceShape  = analysis?.face_shape
+  const undertone  = analysis?.undertone
+  const sizeBand   = analysis?.size_band
 
   return (
     <main className="min-h-screen bg-stone-50">
@@ -106,7 +96,7 @@ export default function AnalysisPage() {
         </div>
       </header>
 
-      <div className="max-w-2xl mx-auto px-4 pb-28 sm:pb-12">
+      <div className="max-w-2xl mx-auto px-4 pb-16">
 
         {/* ── Error state ─────────────────────────────────────────── */}
         {analysisError ? (
@@ -123,7 +113,7 @@ export default function AnalysisPage() {
           </div>
         ) : (
           <>
-            {/* ── Results hero — appears when analysis is done ─────── */}
+            {/* ── Results hero ────────────────────────────────────── */}
             {isComplete && faceShape && (
               <div className="mt-6 mb-1">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-amber-500 mb-1">
@@ -151,29 +141,11 @@ export default function AnalysisPage() {
             {/* ── Analysis card ───────────────────────────────────── */}
             <AnalysisCard analysis={analysis} />
 
-            {/* ── Recs loading ────────────────────────────────────── */}
-            {isComplete && !recommendations && !recsError && (
-              <div className="mt-6 flex items-center gap-3 text-stone-400 text-sm">
-                <div className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin flex-shrink-0" />
-                Finding your best frames…
-              </div>
-            )}
-
-            {/* ── Recs error ──────────────────────────────────────── */}
-            {recsError && (
-              <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-600 text-sm">
-                {recsError}
-              </div>
-            )}
-
-            {/* ── Frame grid ──────────────────────────────────────── */}
-            {recommendations && session && (
-              <FrameGrid
-                frames={recommendations.frames}
+            {/* ── Frame catalogue with try-on ─────────────────────── */}
+            {isComplete && (
+              <TryOnCatalogueSection
                 jobId={jobId}
-                faceShape={faceShape}
-                undertone={undertone}
-                generationsRemaining={session.generations_remaining}
+                generationsRemaining={session?.generations_remaining ?? 3}
                 onGenerationComplete={handleGenerationComplete}
               />
             )}

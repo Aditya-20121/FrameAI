@@ -8,10 +8,10 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import type { Frame } from '@/lib/types'
+import type { CatalogueFrame } from '@/lib/types'
 
 type Props = {
-  frame: Frame
+  frame: CatalogueFrame
   generationsRemaining: number
   onClose: () => void
   onConfirm: () => void
