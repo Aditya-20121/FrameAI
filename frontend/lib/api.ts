@@ -11,13 +11,28 @@ import type {
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 const SESSION_KEY = '_frameai_token'
 
+// In-memory fallback for environments where localStorage is unavailable
+// (iOS Private Browsing, storage-restricted contexts, etc.)
+let _memToken: string | null = null
+
 function getStoredToken(): string | null {
   if (typeof window === 'undefined') return null
-  return localStorage.getItem(SESSION_KEY)
+  try {
+    return localStorage.getItem(SESSION_KEY) ?? _memToken
+  } catch {
+    return _memToken
+  }
 }
 
 function storeToken(token: string): void {
-  if (typeof window !== 'undefined') localStorage.setItem(SESSION_KEY, token)
+  _memToken = token
+  if (typeof window === 'undefined') return
+  try {
+    localStorage.setItem(SESSION_KEY, token)
+  } catch {
+    // localStorage unavailable (Private Browsing quota exceeded, etc.)
+    // _memToken already set above — session survives the current page lifetime
+  }
 }
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
