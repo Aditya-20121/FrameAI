@@ -145,23 +145,23 @@ export default function CameraView({ onCapture, onSwitchToUpload, onNoCameraAvai
     if (capturingRef.current || disabled) return
     const video = videoRef.current
     const canvas = canvasRef.current
-    if (!video || !canvas) return
+    // Guard: stream must be ready and have actual dimensions
+    if (!video || !canvas || video.readyState < 2 || !video.videoWidth) return
     capturingRef.current = true
-    canvas.width = video.videoWidth
+    canvas.width  = video.videoWidth
     canvas.height = video.videoHeight
-    // Draw mirrored so the preview matches what the user saw in the viewfinder
-    const ctx = canvas.getContext('2d')!
-    ctx.translate(canvas.width, 0)
-    ctx.scale(-1, 1)
+    // Draw raw (no transform) — correct orientation for AI analysis.
+    // The preview <img> uses CSS scaleX(-1) to show it mirrored, matching the viewfinder.
+    const ctx = canvas.getContext('2d')
+    if (!ctx) { capturingRef.current = false; return }
     ctx.drawImage(video, 0, 0)
-    ctx.setTransform(1, 0, 0, 1, 0, 0)
 
     const finish = (blob: Blob | null) => {
       if (!blob) { capturingRef.current = false; return }
       setPreview({ blob, url: URL.createObjectURL(blob) })
     }
 
-    // Try WebP first; fall back to JPEG on older iOS
+    // Try WebP first; fall back to JPEG on older iOS where WebP canvas encoding is unsupported
     canvas.toBlob(blob => {
       if (blob) { finish(blob); return }
       canvas.toBlob(finish, 'image/jpeg', 0.92)
@@ -196,19 +196,21 @@ export default function CameraView({ onCapture, onSwitchToUpload, onNoCameraAvai
   if (preview) {
     return (
       <div className="flex-1 relative flex flex-col overflow-hidden">
-        {/* Captured photo */}
+        {/* Captured photo — mirrored with CSS so it matches what the user saw in the viewfinder */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={preview.url}
           alt="Your photo"
           className="w-full h-full object-cover"
+          style={{ transform: 'scaleX(-1)' }}
         />
 
         {/* Dark gradient at bottom */}
         <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
 
-        {/* Actions */}
-        <div className="absolute bottom-8 inset-x-0 flex flex-col items-center gap-3 px-6 z-10">
+        {/* Actions — safe area ensures buttons clear the iOS home indicator */}
+        <div className="absolute bottom-0 inset-x-0 flex flex-col items-center gap-3 px-6 z-10
+                        pb-[max(2rem,env(safe-area-inset-bottom))]">
           <button
             onClick={() => onCapture(preview.blob)}
             disabled={disabled}
@@ -269,7 +271,8 @@ export default function CameraView({ onCapture, onSwitchToUpload, onNoCameraAvai
       )}
 
       {/* Manual capture + upload link */}
-      <div className="absolute bottom-6 left-0 right-0 flex flex-col items-center gap-3 z-10">
+      <div className="absolute bottom-0 left-0 right-0 flex flex-col items-center gap-3 z-10
+                      pb-[max(1.5rem,env(safe-area-inset-bottom))]">
         <button
           onClick={capturePhoto}
           disabled={disabled}
