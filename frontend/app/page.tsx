@@ -203,6 +203,10 @@ export default function Home() {
               <Link href="/terms" className="text-stone-400 text-xs underline underline-offset-2 hover:text-stone-600 transition-colors">
                 Terms &amp; Conditions
               </Link>
+              <span className="text-stone-200 text-xs">·</span>
+              <Link href="/contact" className="text-stone-400 text-xs underline underline-offset-2 hover:text-stone-600 transition-colors">
+                Contact
+              </Link>
             </div>
           </div>
         </div>

@@ -124,7 +124,8 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-base font-bold text-stone-900 mb-2">6. Your rights</h2>
             <p>
-              You can request deletion of any data associated with your session by contacting us.
+              You can request deletion of any data associated with your session by visiting our{' '}
+              <a href="/contact" className="text-amber-600 underline underline-offset-2">Contact page</a>.
               Since we do not collect your name or email, please include your session token
               (visible in your browser&apos;s cookies under <code className="text-xs bg-stone-100 px-1 py-0.5 rounded">_frameai_session</code>)
               so we can locate your records.
@@ -159,10 +160,8 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-base font-bold text-stone-900 mb-2">10. Contact</h2>
             <p>
-              For privacy questions or deletion requests:{' '}
-              <a href="mailto:adityakakade2021@gmail.com" className="text-amber-600 underline underline-offset-2">
-                adityakakade2021@gmail.com
-              </a>
+              For privacy questions or deletion requests, visit our{' '}
+              <a href="/contact" className="text-amber-600 underline underline-offset-2">Contact page</a>.
             </p>
           </section>
 

@@ -43,10 +43,8 @@ export default function TermsPage() {
             <p>
               FrameAI (&quot;we&quot;, &quot;us&quot;, &quot;our&quot;) is an AI-powered eyeglass frame recommendation platform
               operated by <strong className="text-stone-800">Aditya Kakade</strong>, an individual based in India
-              (&quot;Operator&quot;). Contact:{' '}
-              <a href="mailto:adityakakade2021@gmail.com" className="text-amber-600 underline underline-offset-2">
-                adityakakade2021@gmail.com
-              </a>.
+              (&quot;Operator&quot;). For contact details, see our{' '}
+              <Link href="/contact" className="text-amber-600 underline underline-offset-2">Contact page</Link>.
             </p>
             <p className="mt-2">
               FrameAI is a prototype product and is provided free of charge. It is not a registered
@@ -136,10 +134,8 @@ export default function TermsPage() {
                 <p className="font-semibold text-stone-800 mb-1">Withdrawal of consent</p>
                 <p className="text-xs">
                   You may withdraw consent at any time by closing the session and not submitting a photo.
-                  For deletion of data already submitted, contact us at{' '}
-                  <a href="mailto:adityakakade2021@gmail.com" className="text-amber-600 underline underline-offset-2">
-                    adityakakade2021@gmail.com
-                  </a>{' '}
+                  For deletion of data already submitted,{' '}
+                  <Link href="/contact" className="text-amber-600 underline underline-offset-2">contact us</Link>{' '}
                   with your session token (found in your browser cookies under{' '}
                   <code className="text-xs bg-stone-100 px-1 py-0.5 rounded">_frameai_session</code>).
                   Withdrawal does not affect the lawfulness of processing carried out before withdrawal.
@@ -176,7 +172,7 @@ export default function TermsPage() {
               {[
                 {
                   name: 'Segmind (Google Gemini 2.5 Flash Lite)',
-                  data: 'Your facial photograph is sent to Segmind\'s API for AI-based face analysis.',
+                  data: "Your facial photograph is sent to Segmind's API for AI-based face analysis.",
                   link: 'https://www.segmind.com/privacy',
                 },
                 {
@@ -266,7 +262,7 @@ export default function TermsPage() {
                 },
                 {
                   right: 'Right to Grievance Redressal',
-                  desc: 'You may raise a grievance with our Grievance Officer (Section 17 of these Terms).',
+                  desc: 'You may raise a grievance with our Grievance Officer (Section 18 of these Terms).',
                 },
                 {
                   right: 'Right to Nominate',
@@ -280,10 +276,8 @@ export default function TermsPage() {
               ))}
             </div>
             <p className="mt-3 text-xs text-stone-500">
-              To exercise any of the above rights, contact us at{' '}
-              <a href="mailto:adityakakade2021@gmail.com" className="text-amber-600 underline underline-offset-2">
-                adityakakade2021@gmail.com
-              </a>.
+              To exercise any of the above rights,{' '}
+              <Link href="/contact" className="text-amber-600 underline underline-offset-2">contact us</Link>.
               We will respond within 15 working days.
             </p>
           </section>
@@ -329,9 +323,7 @@ export default function TermsPage() {
           {/* 12 */}
           <section>
             <h2 className="text-base font-bold text-stone-900 mb-2">12. Limitation of Liability</h2>
-            <p>
-              To the maximum extent permitted by applicable Indian law:
-            </p>
+            <p>To the maximum extent permitted by applicable Indian law:</p>
             <ul className="list-disc list-inside space-y-1 mt-2">
               <li>
                 FrameAI is provided &quot;as is&quot; without warranties of any kind, express or implied,
@@ -416,8 +408,9 @@ export default function TermsPage() {
               Terms shall be subject to the exclusive jurisdiction of the competent courts in India.
             </p>
             <p className="mt-2">
-              We encourage you to first contact us to attempt an amicable resolution before
-              initiating any legal proceedings.
+              We encourage you to first{' '}
+              <Link href="/contact" className="text-amber-600 underline underline-offset-2">contact us</Link>{' '}
+              to attempt an amicable resolution before initiating any legal proceedings.
             </p>
           </section>
 
@@ -438,13 +431,10 @@ export default function TermsPage() {
                   <span className="text-stone-700">Grievance Officer, FrameAI</span>
                 </div>
                 <div className="flex gap-3">
-                  <span className="text-stone-400 w-28 flex-shrink-0">Email</span>
-                  <a
-                    href="mailto:adityakakade2021@gmail.com"
-                    className="text-amber-600 underline underline-offset-2"
-                  >
-                    adityakakade2021@gmail.com
-                  </a>
+                  <span className="text-stone-400 w-28 flex-shrink-0">Contact</span>
+                  <Link href="/contact" className="text-amber-600 underline underline-offset-2">
+                    Contact page →
+                  </Link>
                 </div>
                 <div className="flex gap-3">
                   <span className="text-stone-400 w-28 flex-shrink-0">Country</span>
@@ -453,14 +443,13 @@ export default function TermsPage() {
               </div>
               <div className="mt-4 pt-3 border-t border-stone-100 text-xs text-stone-500 space-y-1.5">
                 <p>
-                  Grievances must be submitted in writing to the email above. The Grievance
-                  Officer will <strong className="text-stone-700">acknowledge your grievance within 24 hours</strong> and
+                  Grievances must be submitted in writing via the{' '}
+                  <Link href="/contact" className="text-amber-600 underline underline-offset-2">Contact page</Link>.
+                  The Grievance Officer will <strong className="text-stone-700">acknowledge your grievance within 24 hours</strong> and
                   endeavour to resolve it within <strong className="text-stone-700">15 working days</strong> of receipt
                   (30 days for e-commerce related complaints under the Consumer Protection Rules 2020).
                 </p>
-                <p>
-                  If your grievance is not resolved satisfactorily, you may escalate to:
-                </p>
+                <p>If your grievance is not resolved satisfactorily, you may escalate to:</p>
                 <ul className="list-disc list-inside space-y-0.5 ml-1">
                   <li>The <strong className="text-stone-700">Data Protection Board of India</strong> (for data-related complaints under the DPDP Act 2023)</li>
                   <li>The <strong className="text-stone-700">National Consumer Helpline</strong> at 1800-11-4000 (toll-free)</li>
@@ -487,18 +476,9 @@ export default function TermsPage() {
           <section>
             <h2 className="text-base font-bold text-stone-900 mb-2">20. Contact</h2>
             <p>
-              For general queries, privacy requests, or legal notices:
+              For general queries, privacy requests, or legal notices, visit our{' '}
+              <Link href="/contact" className="text-amber-600 underline underline-offset-2">Contact page</Link>.
             </p>
-            <div className="mt-2 bg-white border border-stone-100 rounded-xl p-4 text-sm">
-              <p className="font-semibold text-stone-800">FrameAI</p>
-              <p className="text-stone-500">Operated by Aditya Kakade, India</p>
-              <a
-                href="mailto:adityakakade2021@gmail.com"
-                className="text-amber-600 underline underline-offset-2"
-              >
-                adityakakade2021@gmail.com
-              </a>
-            </div>
           </section>
 
           <p className="text-xs text-stone-400 pt-4 border-t border-stone-100">
