@@ -21,7 +21,7 @@ export default function FrameCatalogueCard({ frame }: Props) {
   const [imgFailed, setImgFailed] = useState(false)
 
   return (
-    <div className="bg-white rounded-2xl border border-stone-100 overflow-hidden shadow-sm active:scale-[0.98] transition-transform">
+    <div className="group bg-white rounded-2xl border border-stone-100 overflow-hidden shadow-sm active:scale-[0.98] hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
       {/* Image */}
       <div className="relative bg-stone-50 aspect-square">
         {imgFailed ? (
