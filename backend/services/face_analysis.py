@@ -1,41 +1,26 @@
 """
-Face analysis pipeline — two-stage:
+Face analysis pipeline — pure vision AI.
 
-Stage 1 (free, local): MediaPipe face validation + landmark extraction → IPD/size_band
-Stage 2 (AI):          Segmind Qwen3 VL Flash → face shape + undertone + explanations
-                       ~$0.0001/analysis, ~2s response time
+Stage 1 (local):  Basic image validation (resolution, blur, face presence via Haar cascade)
+Stage 2 (cloud):  Segmind Gemini 2.5 Flash Lite → face shape, undertone, features
 
-Falls back to geometric classification if Qwen3 VL Flash is unavailable.
-
-InsightFace note: NOT used here. MediaPipe FaceDetection used for validation only.
+No MediaPipe. No geometric math. The VLM handles all face shape reasoning.
+~$0.00011 per call (543 tokens avg at Gemini 2.5 Flash Lite rates).
 """
 import base64
 import io
 import json
-import math
 import re
 from dataclasses import dataclass
 
 import cv2
 import httpx
 import numpy as np
-import mediapipe as mp
 from PIL import Image
 
 from config import settings
 
-# mp.solutions was removed in mediapipe 0.10.14+. Make it optional —
-# Qwen3 VL Flash handles face shape/undertone; landmark extraction is best-effort.
-_MP_SOLUTIONS = getattr(mp, 'solutions', None)
-
-# ── Landmark index constants ───────────────────────────────────────────────────
-_LM_FOREHEAD_L   = 54;   _LM_FOREHEAD_R  = 284
-_LM_CHEEK_L      = 234;  _LM_CHEEK_R     = 454
-_LM_JAW_L        = 172;  _LM_JAW_R       = 397
-_LM_FACE_TOP     = 10;   _LM_CHIN        = 152
-_LM_LEFT_INNER   = 133;  _LM_RIGHT_INNER = 362
-
-QWEN_ENDPOINT = "https://api.segmind.com/v1/qwen3-vl-flash"
+GEMINI_ENDPOINT = "https://api.segmind.com/v1/gemini-2.5-flash-lite"
 
 ANALYSIS_PROMPT = """Look at this portrait photo and analyse the person's face using professional optometry standards.
 Return ONLY a valid JSON object — no markdown fences, no extra text:
@@ -76,50 +61,26 @@ Eye set definitions:
 - average: balanced, standard spacing between the eyes
 - wide: noticeable gap between the eyes relative to face width
 
-Skin undertone definitions (this is constant — it does not change with sun exposure):
+Skin undertone (constant — does not change with sun exposure):
 - warm: golden, yellow, peachy, or olive base tones
 - cool: pink, rosy, reddish, or bluish-pink base tones
 - neutral: balanced beige — mix of warm and cool
 
-Skin depth definitions (how much melanin/pigmentation):
-- fair: very light, minimal melanin — skin appears pale or porcelain
+Skin depth:
+- fair: very light, minimal melanin
 - light: light skin with slightly more pigmentation than fair
 - medium: middle range — golden to light brown tones
 - olive: medium depth with a yellow-green cast
 - deep: rich, high melanin — from brown to deep brown"""
 
 FACE_SHAPE_EXPLANATIONS = {
-    "oval": "Your face has balanced proportions with slightly wider cheekbones tapering gently to the forehead and jaw — the most versatile shape for frames.",
-    "round": "Your face is nearly as wide as it is long, with soft curves all around — angular frames will add great definition.",
-    "square": "Your face has a strong jaw, wide forehead, and similar width throughout — curved frames soften those angles beautifully.",
-    "heart": "Your face is widest at the forehead and tapers to a narrow chin — bottom-weighted or rimless frames balance it perfectly.",
+    "oval":    "Your face has balanced proportions with slightly wider cheekbones tapering gently to the forehead and jaw — the most versatile shape for frames.",
+    "round":   "Your face is nearly as wide as it is long, with soft curves all around — angular frames will add great definition.",
+    "square":  "Your face has a strong jaw, wide forehead, and similar width throughout — curved frames soften those angles beautifully.",
+    "heart":   "Your face is widest at the forehead and tapers to a narrow chin — bottom-weighted or rimless frames balance it perfectly.",
     "diamond": "Your face is widest at the cheekbones, with a narrower forehead and jawline — frames with detail at the top balance your striking features.",
-    "oblong": "Your face is noticeably longer than wide, with even proportions — wide, oversized frames add beautiful horizontal presence.",
+    "oblong":  "Your face is noticeably longer than wide, with even proportions — wide, oversized frames add beautiful horizontal presence.",
 }
-
-
-# ── Data classes ───────────────────────────────────────────────────────────────
-
-@dataclass
-class FaceGeometry:
-    forehead_width: float
-    cheekbone_width: float
-    jaw_width: float
-    face_length: float
-    ipd_px: float
-    image_height_px: int
-
-    @property
-    def forehead_ratio(self) -> float:
-        return self.forehead_width / self.cheekbone_width if self.cheekbone_width else 1.0
-
-    @property
-    def jaw_ratio(self) -> float:
-        return self.jaw_width / self.cheekbone_width if self.cheekbone_width else 1.0
-
-    @property
-    def aspect_ratio(self) -> float:
-        return self.face_length / self.cheekbone_width if self.cheekbone_width else 1.3
 
 
 @dataclass
@@ -127,13 +88,13 @@ class AnalysisResult:
     face_shape: str
     face_shape_confidence: float
     face_shape_explanation: str
-    jawline: str           # angular | soft | tapered
-    cheekbones: str        # high | normal | low
-    eye_set: str           # close | average | wide
+    jawline: str
+    cheekbones: str
+    eye_set: str
     undertone: str
     undertone_confidence: float
     undertone_hex: str
-    skin_depth: str        # fair | light | medium | olive | deep
+    skin_depth: str
     ipd_mm: float
     size_band: str
     landmarks: list
@@ -141,7 +102,7 @@ class AnalysisResult:
 
 # ── Image + face validation ────────────────────────────────────────────────────
 
-MIN_RESOLUTION = 512
+MIN_RESOLUTION  = 512
 MIN_FACE_FRACTION = 0.25
 
 
@@ -164,114 +125,22 @@ def validate_image(image_bytes: bytes) -> np.ndarray:
 
 
 def validate_faces(bgr: np.ndarray) -> None:
-    if _MP_SOLUTIONS is None:
-        # solutions API unavailable (mediapipe ≥ 0.10.14).
-        # Fall back to OpenCV Haar cascade for basic face presence check.
-        cascade_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
-        cascade = cv2.CascadeClassifier(cascade_path)
-        gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
-        faces = cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=6, minSize=(80, 80))
-        if len(faces) == 0:
-            raise ValueError("no_face_detected")
-        h, w = bgr.shape[:2]
-        # Only count faces that meet the minimum size threshold to avoid false positives
-        # from small reflections, background faces, or duplicate detections.
-        significant = [(x, y, fw, fh) for (x, y, fw, fh) in faces
-                       if (fw * fh) / (w * h) >= MIN_FACE_FRACTION]
-        if len(significant) > 1:
-            raise ValueError("multiple_faces")
-        return
+    cascade_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+    cascade = cv2.CascadeClassifier(cascade_path)
+    gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
+    faces = cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=6, minSize=(80, 80))
 
-    mp_fd = _MP_SOLUTIONS.face_detection
+    if len(faces) == 0:
+        raise ValueError("no_face_detected")
+
     h, w = bgr.shape[:2]
-    image_area = h * w
-    rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
-
-    with mp_fd.FaceDetection(model_selection=1, min_detection_confidence=0.4) as detector:
-        results = detector.process(rgb)
-
-    if not results.detections:
-        raise ValueError("no_face_detected")
-    # Only raise multiple_faces if 2+ detections are both large enough to be real subjects.
-    if len(results.detections) > 1:
-        significant = [
-            d for d in results.detections
-            if (d.location_data.relative_bounding_box.width * w)
-               * (d.location_data.relative_bounding_box.height * h) / image_area >= MIN_FACE_FRACTION
-        ]
-        if len(significant) > 1:
-            raise ValueError("multiple_faces")
-
-    # face_too_small check removed — analysis proceeds regardless of face size
+    significant = [(x, y, fw, fh) for (x, y, fw, fh) in faces
+                   if (fw * fh) / (w * h) >= MIN_FACE_FRACTION]
+    if len(significant) > 1:
+        raise ValueError("multiple_faces")
 
 
-# ── Landmark extraction + IPD ──────────────────────────────────────────────────
-
-def extract_landmarks(bgr: np.ndarray):
-    """Returns face landmarks, or None if mp.solutions is unavailable."""
-    if _MP_SOLUTIONS is None:
-        return None
-
-    mp_fm = _MP_SOLUTIONS.face_mesh
-    rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
-
-    with mp_fm.FaceMesh(
-        static_image_mode=True,
-        max_num_faces=1,
-        refine_landmarks=True,
-        min_detection_confidence=0.4,
-    ) as mesh:
-        results = mesh.process(rgb)
-
-    if not results.multi_face_landmarks:
-        raise ValueError("no_face_detected")
-    return results.multi_face_landmarks[0].landmark
-
-
-def _dist(a, b, w: int, h: int) -> float:
-    return math.hypot((a.x - b.x) * w, (a.y - b.y) * h)
-
-
-def compute_geometry(landmarks, w: int, h: int) -> FaceGeometry:
-    lm = landmarks
-    return FaceGeometry(
-        forehead_width  = _dist(lm[_LM_FOREHEAD_L], lm[_LM_FOREHEAD_R], w, h),
-        cheekbone_width = _dist(lm[_LM_CHEEK_L],    lm[_LM_CHEEK_R],    w, h),
-        jaw_width       = _dist(lm[_LM_JAW_L],       lm[_LM_JAW_R],      w, h),
-        face_length     = _dist(lm[_LM_FACE_TOP],    lm[_LM_CHIN],       w, h),
-        ipd_px          = _dist(lm[_LM_LEFT_INNER],  lm[_LM_RIGHT_INNER], w, h),
-        image_height_px = h,
-    )
-
-
-def compute_ipd_mm(geometry: FaceGeometry) -> float:
-    if geometry.cheekbone_width == 0:
-        return 63.0
-    return round(geometry.ipd_px / (geometry.cheekbone_width / 140.0), 1)
-
-
-def get_size_band(ipd_mm: float) -> str:
-    if ipd_mm < 60:   return "narrow"
-    if ipd_mm <= 66:  return "standard"
-    return "wide"
-
-
-# ── Geometric fallback ─────────────────────────────────────────────────────────
-
-def _classify_geometric(g: FaceGeometry) -> tuple[str, float]:
-    scores = {
-        "oval":    30 * (0.72 <= g.forehead_ratio <= 0.90) + 30 * (0.68 <= g.jaw_ratio <= 0.88) + 40 * (1.25 <= g.aspect_ratio <= 1.65),
-        "round":   30 * (0.85 <= g.forehead_ratio <= 1.02) + 30 * (0.85 <= g.jaw_ratio <= 1.02) + 40 * (g.aspect_ratio < 1.22),
-        "square":  25 * (0.85 <= g.forehead_ratio <= 1.02) + 35 * (0.88 <= g.jaw_ratio <= 1.05) + 40 * (1.05 <= g.aspect_ratio <= 1.40),
-        "heart":   40 * (g.forehead_ratio >= 0.88) + 40 * (g.jaw_ratio <= 0.72) + 20 * (g.aspect_ratio >= 1.15),
-        "diamond": 40 * (g.forehead_ratio <= 0.78) + 40 * (g.jaw_ratio <= 0.78) + 20 * (g.aspect_ratio >= 1.20),
-        "oblong":  50 * (g.aspect_ratio >= 1.50) + 25 * (0.75 <= g.forehead_ratio <= 0.95) + 25 * (0.72 <= g.jaw_ratio <= 0.92),
-    }
-    best = max(scores, key=scores.__getitem__)
-    return best, min(scores[best] / 100.0, 0.72)
-
-
-# ── Qwen3 VL Flash vision analysis ────────────────────────────────────────────
+# ── Gemini 2.5 Flash Lite vision analysis ─────────────────────────────────────
 
 def _image_mime(image_bytes: bytes) -> str:
     if image_bytes[:8] == b'\x89PNG\r\n\x1a\n': return "image/png"
@@ -279,35 +148,41 @@ def _image_mime(image_bytes: bytes) -> str:
     return "image/webp"
 
 
-async def _call_qwen_vision(image_bytes: bytes) -> dict:
-    mime = _image_mime(image_bytes)
+async def _call_gemini_vision(image_bytes: bytes) -> dict:
+    mime   = _image_mime(image_bytes)
     img_b64 = base64.b64encode(image_bytes).decode()
 
     payload = {
-        "messages": [{
-            "role": "user",
-            "content": [
-                {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{img_b64}"}},
-                {"type": "text", "text": ANALYSIS_PROMPT},
-            ],
-        }]
+        "messages": {
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": [
+                        {"text": ANALYSIS_PROMPT},
+                        {"inlineData": {"mimeType": mime, "data": img_b64}},
+                    ],
+                }
+            ]
+        }
     }
     headers = {"x-api-key": settings.segmind_api_key, "Content-Type": "application/json"}
 
     async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.post(QWEN_ENDPOINT, json=payload, headers=headers)
+        resp = await client.post(GEMINI_ENDPOINT, json=payload, headers=headers)
         resp.raise_for_status()
 
-    content = resp.json()["choices"][0]["message"]["content"]
-    # Strip markdown fences if present
-    content = re.sub(r'```(?:json)?\s*|\s*```', '', content).strip()
-    match = re.search(r'\{.*\}', content, re.DOTALL)
+    # Gemini response: candidates[0].content.parts[0].text
+    text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+
+    # Strip markdown fences if the model wraps the JSON anyway
+    text = re.sub(r"```(?:json)?\s*|\s*```", "", text).strip()
+    match = re.search(r"\{.*\}", text, re.DOTALL)
     if not match:
-        raise ValueError(f"No JSON in Qwen3 response: {content[:200]}")
+        raise ValueError(f"No JSON in Gemini response: {text[:200]}")
     return json.loads(match.group())
 
 
-# ── Top-level entry point ──────────────────────────────────────────────────────
+# ── Valid value sets ───────────────────────────────────────────────────────────
 
 _VALID_SHAPES     = {"oval", "round", "square", "heart", "diamond", "oblong"}
 _VALID_TONES      = {"warm", "cool", "neutral"}
@@ -317,64 +192,36 @@ _VALID_EYE_SET    = {"close", "average", "wide"}
 _VALID_SKIN_DEPTH = {"fair", "light", "medium", "olive", "deep"}
 
 
+# ── Top-level entry point ──────────────────────────────────────────────────────
+
 async def run_face_analysis(image_bytes: bytes) -> AnalysisResult:
     """
-    Full pipeline. Assumes image + face already validated by the caller.
+    Full pipeline:
+    Stage 1 — local image decode (resolution + blur check already done by validate_image)
+    Stage 2 — Gemini 2.5 Flash Lite VLM → face shape, undertone, features
 
-    Stage 1: MediaPipe FaceMesh → landmarks → IPD + size_band (best-effort)
-    Stage 2: Qwen3 VL Flash → face shape + features + undertone + skin depth
-             Falls back to geometric rules if Qwen call fails.
+    Raises on failure so the caller can return a proper 500 to the client.
     """
-    bgr = cv2.imdecode(np.frombuffer(image_bytes, np.uint8), cv2.IMREAD_COLOR)
-    if bgr is None:
-        raise ValueError("unsupported_format")
+    q = await _call_gemini_vision(image_bytes)
 
-    h, w = bgr.shape[:2]
-    try:
-        landmarks = extract_landmarks(bgr)
-    except Exception:
-        landmarks = None
+    fs = q.get("face_shape", "").lower().strip()
+    ut = q.get("undertone",  "").lower().strip()
+    jl = q.get("jawline",    "").lower().strip()
+    cb = q.get("cheekbones", "").lower().strip()
+    es = q.get("eye_set",    "").lower().strip()
+    sd = q.get("skin_depth", "").lower().strip()
 
-    if landmarks is not None:
-        geometry  = compute_geometry(landmarks, w, h)
-        ipd_mm    = compute_ipd_mm(geometry)
-        size_band = get_size_band(ipd_mm)
-    else:
-        geometry  = None
-        ipd_mm    = 63.0   # average adult IPD
-        size_band = "standard"
+    face_shape     = fs if fs in _VALID_SHAPES     else "oval"
+    undertone      = ut if ut in _VALID_TONES      else "neutral"
+    jawline        = jl if jl in _VALID_JAWLINES   else "soft"
+    cheekbones     = cb if cb in _VALID_CHEEKBONES else "normal"
+    eye_set        = es if es in _VALID_EYE_SET    else "average"
+    skin_depth     = sd if sd in _VALID_SKIN_DEPTH else "medium"
 
-    # Defaults (used if Qwen fails)
-    face_shape = "oval";  confidence = 0.80
-    explanation = FACE_SHAPE_EXPLANATIONS["oval"]
-    undertone = "neutral"; undertone_conf = 0.75; undertone_hex = "#C8956C"
-    jawline = "soft"; cheekbones = "normal"; eye_set = "average"; skin_depth = "medium"
-
-    try:
-        q = await _call_qwen_vision(image_bytes)
-
-        fs = q.get("face_shape", "oval").lower().strip()
-        ut = q.get("undertone", "neutral").lower().strip()
-        jl = q.get("jawline", "soft").lower().strip()
-        cb = q.get("cheekbones", "normal").lower().strip()
-        es = q.get("eye_set", "average").lower().strip()
-        sd = q.get("skin_depth", "medium").lower().strip()
-
-        face_shape     = fs if fs in _VALID_SHAPES     else "oval"
-        confidence     = float(q.get("face_shape_confidence", 0.85))
-        explanation    = q.get("face_shape_explanation") or FACE_SHAPE_EXPLANATIONS[face_shape]
-        undertone      = ut if ut in _VALID_TONES      else "neutral"
-        undertone_conf = float(q.get("undertone_confidence", 0.80))
-        undertone_hex  = q.get("undertone_hex", "#C8956C")
-        jawline        = jl if jl in _VALID_JAWLINES   else "soft"
-        cheekbones     = cb if cb in _VALID_CHEEKBONES else "normal"
-        eye_set        = es if es in _VALID_EYE_SET    else "average"
-        skin_depth     = sd if sd in _VALID_SKIN_DEPTH else "medium"
-
-    except Exception:
-        if geometry is not None:
-            face_shape, confidence = _classify_geometric(geometry)
-        explanation = FACE_SHAPE_EXPLANATIONS[face_shape]
+    confidence     = float(q.get("face_shape_confidence", 0.85))
+    explanation    = q.get("face_shape_explanation") or FACE_SHAPE_EXPLANATIONS[face_shape]
+    undertone_conf = float(q.get("undertone_confidence", 0.80))
+    undertone_hex  = q.get("undertone_hex", "#C8956C")
 
     return AnalysisResult(
         face_shape=face_shape,
@@ -387,7 +234,7 @@ async def run_face_analysis(image_bytes: bytes) -> AnalysisResult:
         undertone_confidence=round(undertone_conf, 3),
         undertone_hex=undertone_hex,
         skin_depth=skin_depth,
-        ipd_mm=ipd_mm,
-        size_band=size_band,
-        landmarks=list(landmarks) if landmarks is not None else [],
+        ipd_mm=63.0,    # IPD removed (was MediaPipe-only); default adult average
+        size_band="standard",
+        landmarks=[],
     )

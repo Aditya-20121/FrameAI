@@ -1,13 +1,13 @@
 """
-Image generation service — Sprint 3.
+Image generation service.
 
-Model: Segmind Nano Banana v1 ($0.04/generation)
-  https://www.segmind.com/models/nano-banana/api
+Model: Segmind Nano Banana 2 Lite
+  https://www.segmind.com/models/nano-banana-2-lite/api
 
 Pipeline:
   1. Get presigned URL for user photo (already in R2)
   2. Get presigned URL for frame product image (already in R2)
-  3. POST both URLs to Nano Banana via image_urls[]
+  3. POST both URLs to Nano Banana 2 Lite via image_urls[]
   4. Convert response to WEBP, upload to R2, return key
 """
 import base64
@@ -19,7 +19,7 @@ from PIL import Image
 from config import settings
 from services import storage
 
-SEGMIND_ENDPOINT = "https://api.segmind.com/v1/nano-banana"
+SEGMIND_ENDPOINT = "https://api.segmind.com/v1/nano-banana-2-lite"
 
 
 def build_generation_prompt(frame: dict) -> str:
@@ -68,6 +68,8 @@ async def _call_segmind(person_url: str, frame_url: str, prompt: str) -> bytes:
         "image_urls":          [person_url, frame_url],
         "aspect_ratio":        "3:4",
         "response_modalities": "IMAGE",
+        "output_format":       "jpg",
+        "thinking_level":      "minimal",  # faster for real-time try-on; "high" adds latency
     }
     headers = {
         "x-api-key":    settings.segmind_api_key,

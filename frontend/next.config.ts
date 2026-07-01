@@ -8,7 +8,7 @@ const ContentSecurityPolicy = `
   style-src 'self' 'unsafe-inline';
   img-src 'self' data: blob: https://r2.frameai.in https://*.r2.cloudflarestorage.com https://*.amazonaws.com;
   font-src 'self' https://fonts.gstatic.com;
-  connect-src 'self' ${API} https://api.segmind.com;
+  connect-src 'self' ${API} https://api.segmind.com https://tfhub.dev https://www.kaggle.com https://storage.googleapis.com;
   frame-ancestors 'none';
   object-src 'none';
   base-uri 'self';
