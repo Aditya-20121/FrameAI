@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import OvalGuide from './OvalGuide'
-import { Camera } from 'lucide-react'
+import { Camera, RotateCcw } from 'lucide-react'
 
 type Props = {
   onCapture: (blob: Blob) => void
@@ -18,12 +18,18 @@ export default function CameraView({ onCapture, onSwitchToUpload, onNoCameraAvai
   const modelRef = useRef<unknown>(null)
   const detectionRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const alignedSinceRef = useRef<number | null>(null)
-  const capturedRef = useRef(false)
+  const capturingRef = useRef(false)
 
   const [cameraError, setCameraError] = useState<string | null>(null)
   const [isAligned, setIsAligned] = useState(false)
   const [modelReady, setModelReady] = useState(false)
   const [countdown, setCountdown] = useState(0)
+  const [preview, setPreview] = useState<{ blob: Blob; url: string } | null>(null)
+
+  // Revoke object URL on unmount
+  useEffect(() => {
+    return () => { if (preview) URL.revokeObjectURL(preview.url) }
+  }, [preview])
 
   // Load BlazeFace (non-blocking; camera works without it)
   useEffect(() => {
@@ -74,7 +80,7 @@ export default function CameraView({ onCapture, onSwitchToUpload, onNoCameraAvai
     }
   }, [onNoCameraAvailable])
 
-  // Face detection loop — only runs when model is ready
+  // Face detection loop — only runs when model is ready and no preview shown
   useEffect(() => {
     if (!modelReady) return
 
@@ -87,7 +93,7 @@ export default function CameraView({ onCapture, onSwitchToUpload, onNoCameraAvai
         }>>
       } | null
 
-      if (!video || !model || video.readyState < 2 || capturedRef.current || disabled) return
+      if (!video || !model || video.readyState < 2 || capturingRef.current || disabled) return
 
       const preds = await model.estimateFaces(video, false)
 
@@ -136,24 +142,40 @@ export default function CameraView({ onCapture, onSwitchToUpload, onNoCameraAvai
   }, [modelReady, disabled])
 
   const capturePhoto = useCallback(() => {
-    if (capturedRef.current || disabled) return
+    if (capturingRef.current || disabled) return
     const video = videoRef.current
     const canvas = canvasRef.current
     if (!video || !canvas) return
-    capturedRef.current = true
+    capturingRef.current = true
     canvas.width = video.videoWidth
     canvas.height = video.videoHeight
-    canvas.getContext('2d')!.drawImage(video, 0, 0)
-    // Try WebP first; fall back to JPEG on older iOS where WebP canvas encoding is unsupported
+    // Draw mirrored so the preview matches what the user saw in the viewfinder
+    const ctx = canvas.getContext('2d')!
+    ctx.translate(canvas.width, 0)
+    ctx.scale(-1, 1)
+    ctx.drawImage(video, 0, 0)
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
+
+    const finish = (blob: Blob | null) => {
+      if (!blob) { capturingRef.current = false; return }
+      setPreview({ blob, url: URL.createObjectURL(blob) })
+    }
+
+    // Try WebP first; fall back to JPEG on older iOS
     canvas.toBlob(blob => {
-      if (blob) { onCapture(blob); return }
-      canvas.toBlob(jpegBlob => {
-        if (jpegBlob) { onCapture(jpegBlob); return }
-        // Both failed — reset so user can try again
-        capturedRef.current = false
-      }, 'image/jpeg', 0.92)
+      if (blob) { finish(blob); return }
+      canvas.toBlob(finish, 'image/jpeg', 0.92)
     }, 'image/webp', 0.92)
-  }, [disabled, onCapture])
+  }, [disabled])
+
+  function retake() {
+    if (preview) URL.revokeObjectURL(preview.url)
+    setPreview(null)
+    capturingRef.current = false
+    setIsAligned(false)
+    alignedSinceRef.current = null
+    setCountdown(0)
+  }
 
   if (cameraError) {
     return (
@@ -170,6 +192,47 @@ export default function CameraView({ onCapture, onSwitchToUpload, onNoCameraAvai
     )
   }
 
+  // ── Preview screen — shown after capture, before upload ──────────────────────
+  if (preview) {
+    return (
+      <div className="flex-1 relative flex flex-col overflow-hidden">
+        {/* Captured photo */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={preview.url}
+          alt="Your photo"
+          className="w-full h-full object-cover"
+        />
+
+        {/* Dark gradient at bottom */}
+        <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
+
+        {/* Actions */}
+        <div className="absolute bottom-8 inset-x-0 flex flex-col items-center gap-3 px-6 z-10">
+          <button
+            onClick={() => onCapture(preview.blob)}
+            disabled={disabled}
+            className="w-full max-w-xs py-4 rounded-2xl bg-amber-400 text-neutral-950 font-bold text-base
+                       shadow-lg active:scale-[0.98] transition-transform disabled:opacity-50"
+          >
+            {disabled ? 'Analysing…' : 'Analyse My Face'}
+          </button>
+          <button
+            onClick={retake}
+            disabled={disabled}
+            className="flex items-center gap-1.5 text-white/70 text-sm disabled:opacity-40"
+          >
+            <RotateCcw className="w-4 h-4" />
+            Retake
+          </button>
+        </div>
+
+        <canvas ref={canvasRef} className="hidden" />
+      </div>
+    )
+  }
+
+  // ── Live camera viewfinder ───────────────────────────────────────────────────
   return (
     <div className="flex-1 relative flex flex-col overflow-hidden">
       {/* Instruction pill */}

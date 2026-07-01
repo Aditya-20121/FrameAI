@@ -85,12 +85,6 @@ export default function AnalysePage() {
         )}
       </div>
 
-      {error && (
-        <div className="mx-4 mb-4 p-3 bg-red-900/40 border border-red-700/50 rounded-xl text-red-300 text-sm z-10">
-          {error}
-        </div>
-      )}
-
       {uploading && (
         <div className="absolute inset-0 bg-stone-900/92 flex flex-col items-center justify-center z-50 px-6">
           <p className="text-white font-bold text-xl mb-1">Reading your face…</p>
@@ -99,6 +93,14 @@ export default function AnalysePage() {
             estimatedSeconds={5}
             dark
           />
+        </div>
+      )}
+
+      {error && (
+        <div className="absolute inset-x-4 bottom-6 p-4 bg-red-950/95 border border-red-700/60 rounded-2xl
+                        text-red-300 text-sm z-50 shadow-xl">
+          <p className="font-semibold mb-1">Upload failed</p>
+          <p>{error}</p>
         </div>
       )}
     </main>
