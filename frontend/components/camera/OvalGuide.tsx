@@ -8,7 +8,7 @@ export default function OvalGuide({ isAligned, countdown }: Props) {
     <div className="w-full h-full flex items-center justify-center" style={{ paddingBottom: '12%' }}>
       <div
         style={{
-          width: 'min(56vw, 224px)',
+          width: 'min(60.5vw, 242px)',
           aspectRatio: '3 / 4',
           borderRadius: '50%',
           boxShadow: '0 0 0 100vmax rgba(0,0,0,0.52)',
