@@ -101,7 +101,17 @@ export default function UploadFallback({ onUpload, onSwitchToCamera, disabled }:
         </>
       ) : (
         <div className="flex flex-col">
-          {/* Preview — capped height so the Analyse button is always visible */}
+          <button
+            onClick={() => selectedFile && onUpload(selectedFile)}
+            disabled={disabled}
+            className="mb-4 w-full py-4 bg-amber-500 text-white font-bold rounded-2xl text-base
+                       active:scale-[0.98] transition-transform disabled:opacity-50 disabled:cursor-not-allowed
+                       shadow-md shadow-amber-100"
+          >
+            {disabled ? 'Analysing…' : 'Analyse this photo →'}
+          </button>
+
+          {/* Preview */}
           <div className="relative rounded-2xl overflow-hidden bg-stone-100" style={{ height: 'min(55dvh, 360px)' }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={preview} alt="Preview" className="w-full h-full object-cover" />
@@ -113,16 +123,6 @@ export default function UploadFallback({ onUpload, onSwitchToCamera, disabled }:
               <X className="w-4 h-4 text-stone-700" />
             </button>
           </div>
-
-          <button
-            onClick={() => selectedFile && onUpload(selectedFile)}
-            disabled={disabled}
-            className="mt-4 w-full py-4 bg-amber-500 text-white font-bold rounded-2xl text-base
-                       active:scale-[0.98] transition-transform disabled:opacity-50 disabled:cursor-not-allowed
-                       shadow-md shadow-amber-100"
-          >
-            {disabled ? 'Analysing…' : 'Analyse this photo →'}
-          </button>
         </div>
       )}
     </div>
