@@ -5,10 +5,10 @@ type Props = {
 
 export default function OvalGuide({ isAligned, countdown }: Props) {
   return (
-    <div className="w-full h-full flex items-center justify-center">
+    <div className="w-full h-full flex items-center justify-center" style={{ paddingBottom: '12%' }}>
       <div
         style={{
-          width: 'min(65vw, 260px)',
+          width: 'min(56vw, 224px)',
           aspectRatio: '3 / 4',
           borderRadius: '50%',
           boxShadow: '0 0 0 100vmax rgba(0,0,0,0.52)',
