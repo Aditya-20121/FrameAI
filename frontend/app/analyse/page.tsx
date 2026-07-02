@@ -48,7 +48,7 @@ export default function AnalysePage() {
   // ── Consent gate — shown before camera access ─────────────────────────────
   if (!consentGiven) {
     return (
-      <main className="flex flex-col min-h-[100dvh] bg-stone-50">
+      <main className="flex flex-col min-h-[100dvh] bg-stone-50 overflow-y-auto">
         <header className="flex items-center gap-3 px-4 py-3.5 bg-white border-b border-stone-100">
           <Link href="/" className="text-stone-400 p-1 -ml-1 hover:text-stone-700 transition-colors">
             <ArrowLeft className="w-5 h-5" />
@@ -61,7 +61,7 @@ export default function AnalysePage() {
           </div>
         </header>
 
-        <div className="flex-1 flex flex-col justify-between px-5 py-8 max-w-md mx-auto w-full">
+        <div className="flex-1 flex flex-col px-5 py-8 max-w-md mx-auto w-full">
 
           {/* Icon + heading */}
           <div>
@@ -165,7 +165,7 @@ export default function AnalysePage() {
           </div>
 
           {/* CTA */}
-          <div className="pt-6">
+          <div className="pt-6 mt-auto">
             <button
               disabled={!termsChecked}
               onClick={() => setConsentGiven(true)}
