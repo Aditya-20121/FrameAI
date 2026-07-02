@@ -100,9 +100,9 @@ export default function UploadFallback({ onUpload, onSwitchToCamera, disabled }:
           </button>
         </>
       ) : (
-        <div className="flex-1 flex flex-col">
-          {/* Preview */}
-          <div className="relative flex-1 rounded-2xl overflow-hidden bg-stone-100 min-h-[300px]">
+        <div className="flex flex-col">
+          {/* Preview — capped height so the Analyse button is always visible */}
+          <div className="relative rounded-2xl overflow-hidden bg-stone-100" style={{ height: 'min(55dvh, 360px)' }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={preview} alt="Preview" className="w-full h-full object-cover" />
             <button
