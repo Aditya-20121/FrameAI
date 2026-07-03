@@ -1,10 +1,12 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
+import { motion } from 'framer-motion'
 import { getCatalogue } from '@/lib/api'
 import type { CatalogueFrame } from '@/lib/types'
 import FrameCatalogueCard from './FrameCatalogueCard'
 import { ChevronRight } from 'lucide-react'
+import { fadeUp, fadeUpSm, stagger, viewportOnce } from '@/lib/motion'
 
 const STYLE_TABS = [
   { label: 'All',         value: '' },
@@ -56,15 +58,21 @@ export default function CatalogueSection() {
 
   return (
     <section id="catalogue" className="px-4 py-10">
-      <div className="mb-5">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-amber-500 mb-1">
+      <motion.div
+        className="mb-5"
+        initial="hidden"
+        whileInView="show"
+        viewport={viewportOnce}
+        variants={stagger(0.06)}
+      >
+        <motion.p variants={fadeUpSm} className="text-[10px] font-bold uppercase tracking-widest text-amber-500 mb-1">
           Catalogue
-        </p>
-        <div className="flex items-end justify-between">
+        </motion.p>
+        <motion.div variants={fadeUp} className="flex items-end justify-between">
           <h2 className="text-xl font-extrabold text-stone-900 tracking-tight">Browse frames</h2>
           <span className="text-stone-400 text-xs">400+ styles</span>
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
 
       {/* Style filter tabs — horizontal scroll */}
       <div
@@ -76,7 +84,7 @@ export default function CatalogueSection() {
           <button
             key={tab.value}
             onClick={() => setActiveStyle(tab.value)}
-            className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all
+            className={`flex-shrink-0 px-4 py-2.5 rounded-full text-sm font-medium transition-all min-h-[40px]
               ${activeStyle === tab.value
                 ? 'bg-stone-900 text-white'
                 : 'bg-white text-stone-600 border border-stone-200 active:bg-stone-50'
@@ -111,25 +119,33 @@ export default function CatalogueSection() {
           <p className="text-stone-400 text-sm">No frames found for this style.</p>
           <button
             onClick={() => setActiveStyle('')}
-            className="mt-3 text-amber-600 text-sm font-medium underline underline-offset-2"
+            className="mt-3 text-amber-500 text-sm font-medium underline underline-offset-2"
           >
             Show all frames
           </button>
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <motion.div
+            key={activeStyle}
+            className="grid grid-cols-2 gap-3 sm:grid-cols-3"
+            initial="hidden"
+            animate="show"
+            variants={stagger(0.05)}
+          >
             {frames.map(frame => (
-              <FrameCatalogueCard key={frame.frame_id} frame={frame} />
+              <motion.div key={frame.frame_id} variants={fadeUp}>
+                <FrameCatalogueCard frame={frame} />
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
 
           {hasMore && (
             <button
               onClick={() => fetchFrames(activeStyle, offset, false)}
               disabled={loadingMore}
               className="mt-6 w-full py-3.5 border border-stone-200 rounded-xl text-stone-600 text-sm font-medium
-                         flex items-center justify-center gap-2 active:bg-stone-100 transition-colors disabled:opacity-50"
+                         flex items-center justify-center gap-2 active:bg-stone-100 transition-colors disabled:opacity-50 min-h-[48px]"
             >
               {loadingMore ? (
                 <><div className="w-4 h-4 border-2 border-stone-300 border-t-stone-600 rounded-full animate-spin" /> Loading…</>

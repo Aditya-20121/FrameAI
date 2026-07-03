@@ -186,3 +186,18 @@
 .animate-float {
   animation: float 5s ease-in-out infinite;
 }
+
+/* Demo section — pulse ring around the center photo */
+@keyframes demo-pulse {
+  0%   { transform: scale(1);    opacity: 0.55; }
+  100% { transform: scale(1.6);  opacity: 0; }
+}
+
+/* Demo section — mobile auto-scrolling photo strip (list is duplicated 2x in markup) */
+@keyframes demo-marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.animate-demo-marquee {
+  animation: demo-marquee 22s linear infinite;
+}

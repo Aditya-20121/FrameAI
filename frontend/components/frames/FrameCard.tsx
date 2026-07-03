@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import { motion } from 'framer-motion'
 import { ExternalLink, ShoppingBag, ChevronLeft, ChevronRight } from 'lucide-react'
 import type { CatalogueFrame } from '@/lib/types'
 import { postGenerate, getGenerateStatus } from '@/lib/api'
@@ -87,7 +88,12 @@ export default function FrameCard({ frame, jobId, generationsRemaining, onComple
       {/* ── Image area ───────────────────────────────────────────── */}
       {showComparison ? (
         // Horizontal snap-scroll: [Try-On] [Frame]
-        <div className="relative">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.4 }}
+          className="relative"
+        >
           <div
             ref={scrollRef}
             className="flex overflow-x-auto snap-x snap-mandatory scrollbar-none"
@@ -165,7 +171,7 @@ export default function FrameCard({ frame, jobId, generationsRemaining, onComple
               Swipe to compare
             </div>
           )}
-        </div>
+        </motion.div>
       ) : (
         // Single frame image
         <div className="relative bg-stone-50 w-full aspect-square">
@@ -221,10 +227,11 @@ export default function FrameCard({ frame, jobId, generationsRemaining, onComple
 
         {/* CTA row */}
         <div className="flex gap-2">
-          <button
+          <motion.button
+            whileTap={canTryOn ? { scale: 0.97 } : {}}
             onClick={() => canTryOn && setShowConfirm(true)}
             disabled={!canTryOn && !showComparison}
-            className={`flex-1 py-3 rounded-xl text-sm font-bold transition-all active:scale-[0.97]
+            className={`flex-1 py-3.5 rounded-xl text-sm font-bold transition-colors min-h-[48px]
               ${canTryOn && !isGenerating
                 ? 'bg-amber-500 text-white shadow-md shadow-amber-100'
                 : showComparison
@@ -243,13 +250,13 @@ export default function FrameCard({ frame, jobId, generationsRemaining, onComple
                   : generationsRemaining === 0
                     ? 'No tries left'
                     : 'Try this on'}
-          </button>
+          </motion.button>
 
           <a
             href={frame.buy_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-4 py-3 rounded-xl border border-stone-200 text-stone-600 text-sm font-medium active:bg-stone-50 transition-colors"
+            className="flex items-center gap-1.5 px-4 py-3.5 rounded-xl border border-stone-200 text-stone-600 text-sm font-medium active:bg-stone-50 transition-colors min-h-[48px]"
             title={`Buy at ${frame.retailer}`}
           >
             <ShoppingBag className="w-3.5 h-3.5" />

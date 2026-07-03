@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { motion } from 'framer-motion'
 import { ExternalLink } from 'lucide-react'
 import type { CatalogueFrame } from '@/lib/types'
 
@@ -21,7 +22,12 @@ export default function FrameCatalogueCard({ frame }: Props) {
   const [imgFailed, setImgFailed] = useState(false)
 
   return (
-    <div className="group bg-white rounded-2xl border border-stone-100 overflow-hidden shadow-sm active:scale-[0.98] hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
+    <motion.div
+      whileHover={{ y: -4 }}
+      whileTap={{ scale: 0.98 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+      className="group bg-white rounded-2xl border border-stone-100 overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200"
+    >
       {/* Image */}
       <div className="relative bg-stone-50 aspect-square">
         {imgFailed ? (
@@ -69,13 +75,13 @@ export default function FrameCatalogueCard({ frame }: Props) {
             target="_blank"
             rel="noopener noreferrer"
             onClick={e => e.stopPropagation()}
-            className="flex items-center gap-1 text-xs text-amber-600 font-semibold py-1 px-2 rounded-lg active:bg-amber-50 transition-colors"
+            className="flex items-center gap-1 text-xs text-amber-500 font-semibold py-1.5 px-2 rounded-lg active:bg-amber-50 transition-colors min-h-[32px]"
           >
             View
             <ExternalLink className="w-3 h-3" />
           </a>
         </div>
       </div>
-    </div>
+    </motion.div>
   )
 }

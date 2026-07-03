@@ -1,7 +1,21 @@
+'use client'
+
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
+import { motion } from 'framer-motion'
 import { Scan, Target, Sparkles, ArrowRight } from 'lucide-react'
 import HowItWorks from '@/components/home/HowItWorks'
 import CatalogueSection from '@/components/home/CatalogueSection'
+import { fadeUp, stagger, viewportOnce } from '@/lib/motion'
+
+// Rendered client-only: it drives its own transforms imperatively via Framer
+// Motion (continuous orbit rotation), which never matches SSR-produced markup
+// byte-for-byte (rounding/formatting) and would otherwise throw a hydration
+// mismatch. Nothing in it is SEO-relevant, so skipping SSR is the right fix.
+const DemoSection = dynamic(() => import('@/components/home/DemoSection'), {
+  ssr: false,
+  loading: () => <div className="h-[520px] bg-stone-950" />,
+})
 
 const FEATURES = [
   {
@@ -49,7 +63,7 @@ export default function Home() {
           </div>
           <Link
             href="/analyse"
-            className="flex items-center gap-1.5 text-sm font-semibold bg-stone-900 text-white px-4 py-2 rounded-full active:scale-95 transition-transform hover:bg-stone-700"
+            className="flex items-center gap-1.5 text-sm font-semibold bg-stone-900 text-white px-4 py-2.5 rounded-full active:scale-95 transition-transform hover:bg-stone-700 min-h-[44px]"
           >
             Try free
             <ArrowRight className="w-3.5 h-3.5" />
@@ -70,58 +84,64 @@ export default function Home() {
           style={{ background: 'radial-gradient(circle, #fed7aa 0%, transparent 70%)' }}
         />
 
-        <div className="max-w-2xl mx-auto relative">
-
-          <span
-            className="inline-block text-xs font-bold uppercase tracking-widest text-amber-600 bg-amber-50 border border-amber-100 px-3 py-1.5 rounded-full mb-6 animate-fade-up"
-            style={{ animationDelay: '0ms' }}
+        <motion.div
+          className="max-w-2xl mx-auto relative"
+          initial="hidden"
+          animate="show"
+          variants={stagger(0.09)}
+        >
+          <motion.span
+            variants={fadeUp}
+            className="inline-block text-xs font-bold uppercase tracking-widest text-amber-600 bg-amber-50 border border-amber-100 px-3 py-1.5 rounded-full mb-6"
           >
             AI-powered · Free to try
-          </span>
+          </motion.span>
 
-          <h1
-            className="font-extrabold text-stone-900 leading-[1.1] tracking-tight mb-5 animate-fade-up"
-            style={{ fontSize: 'clamp(2.4rem, 8vw, 3.2rem)', animationDelay: '70ms' }}
+          <motion.h1
+            variants={fadeUp}
+            className="font-extrabold text-stone-900 leading-[1.1] tracking-tight mb-5 text-balance"
+            style={{ fontSize: 'clamp(2.4rem, 8vw, 3.2rem)' }}
           >
             Frames that are
             <br />
             <span className="font-display italic text-amber-500">
               built for your face.
             </span>
-          </h1>
+          </motion.h1>
 
-          <p
-            className="text-stone-500 text-base leading-relaxed mb-8 max-w-xs animate-fade-up"
-            style={{ animationDelay: '140ms' }}
+          <motion.p
+            variants={fadeUp}
+            className="text-stone-500 text-base leading-relaxed mb-8 max-w-xs"
           >
             One selfie. Face shape analysis, undertone detection, and
             recommendations scored for your features.
-          </p>
+          </motion.p>
 
-          <div
-            className="flex flex-col sm:flex-row gap-3 mb-10 animate-fade-up"
-            style={{ animationDelay: '210ms' }}
+          <motion.div
+            variants={fadeUp}
+            className="flex flex-col sm:flex-row gap-3 mb-10"
           >
-            <Link
-              href="/analyse"
-              className="flex items-center justify-center gap-2 bg-amber-500 text-white font-bold text-base px-7 py-4 rounded-2xl active:scale-95 transition-all shadow-lg shadow-amber-200 hover:bg-amber-400 hover:shadow-amber-300 hover:-translate-y-0.5"
-            >
-              Analyse My Face
-              <ArrowRight className="w-4 h-4" />
-            </Link>
-            <a
+            <motion.div whileTap={{ scale: 0.97 }} whileHover={{ y: -2 }}>
+              <Link
+                href="/analyse"
+                className="flex items-center justify-center gap-2 bg-amber-500 text-white font-bold text-base px-7 py-4 rounded-2xl transition-colors shadow-lg shadow-amber-200 hover:bg-amber-400 hover:shadow-amber-300 min-h-[52px]"
+              >
+                Analyse My Face
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            </motion.div>
+            <motion.a
+              whileTap={{ scale: 0.97 }}
+              whileHover={{ y: -2 }}
               href="#catalogue"
-              className="flex items-center justify-center gap-2 bg-white text-stone-700 font-semibold text-base px-6 py-4 rounded-2xl border border-stone-200 active:scale-95 transition-all hover:border-stone-300 hover:shadow-sm hover:-translate-y-0.5"
+              className="flex items-center justify-center gap-2 bg-white text-stone-700 font-semibold text-base px-6 py-4 rounded-2xl border border-stone-200 transition-colors hover:border-stone-300 hover:shadow-sm min-h-[52px]"
             >
               Browse frames
-            </a>
-          </div>
+            </motion.a>
+          </motion.div>
 
           {/* Skin tone inclusivity */}
-          <div
-            className="flex items-center gap-3 animate-fade-up"
-            style={{ animationDelay: '280ms' }}
-          >
+          <motion.div variants={fadeUp} className="flex items-center gap-3">
             <div className="flex -space-x-1.5">
               {SKIN_TONES.map((c, i) => (
                 <div
@@ -134,8 +154,8 @@ export default function Home() {
             <p className="text-stone-400 text-xs">
               Works for <strong className="text-stone-600">all skin tones</strong> · Indian faces included
             </p>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       </section>
 
       {/* ── Marquee strip ──────────────────────────────────────────── */}
@@ -155,21 +175,33 @@ export default function Home() {
 
       {/* ── Feature cards ──────────────────────────────────────────── */}
       <section className="bg-stone-50 px-4 py-8 border-b border-stone-100">
-        <div className="max-w-2xl mx-auto grid grid-cols-3 gap-3">
+        <motion.div
+          className="max-w-2xl mx-auto grid grid-cols-3 gap-3"
+          initial="hidden"
+          whileInView="show"
+          viewport={viewportOnce}
+          variants={stagger(0.1)}
+        >
           {FEATURES.map(({ icon: Icon, title, desc }) => (
-            <div
+            <motion.div
               key={title}
-              className="group bg-white rounded-2xl p-4 border border-stone-100 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-default"
+              variants={fadeUp}
+              whileHover={{ y: -3 }}
+              whileTap={{ scale: 0.97 }}
+              className="bg-white rounded-2xl p-4 border border-stone-100 shadow-sm hover:shadow-md transition-shadow duration-200 cursor-default"
             >
-              <div className="w-9 h-9 bg-amber-50 rounded-xl flex items-center justify-center mb-3 group-hover:bg-amber-100 transition-colors">
-                <Icon className="w-[18px] h-[18px] text-amber-500" strokeWidth={2} />
+              <div className="w-9 h-9 bg-amber-50 rounded-xl flex items-center justify-center mb-3">
+                <Icon className="w-[18px] h-[18px] text-amber-500" strokeWidth={1.75} />
               </div>
               <p className="text-stone-900 font-semibold text-xs mb-1 leading-snug">{title}</p>
               <p className="text-stone-400 text-xs leading-snug">{desc}</p>
-            </div>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
       </section>
+
+      {/* ── Demo section ───────────────────────────────────────────── */}
+      <DemoSection />
 
       {/* ── How it works ───────────────────────────────────────────── */}
       <div className="max-w-2xl mx-auto w-full">

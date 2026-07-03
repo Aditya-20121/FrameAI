@@ -3,11 +3,13 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { motion } from 'framer-motion'
 import { ArrowLeft, RotateCcw } from 'lucide-react'
 import { getAnalysis, getSession } from '@/lib/api'
 import type { AnalysisResponse, SessionResponse } from '@/lib/types'
 import AnalysisCard from '@/components/analysis/AnalysisCard'
 import TryOnCatalogueSection from '@/components/frames/TryOnCatalogueSection'
+import { fadeUp, fadeUpSm, stagger } from '@/lib/motion'
 
 const SHAPE_LABELS: Record<string, string> = {
   oval: 'Oval', round: 'Round', square: 'Square',
@@ -88,7 +90,7 @@ export default function AnalysisPage() {
           {session && (
             <span className={`ml-auto text-xs font-semibold px-2.5 py-1 rounded-full ${
               session.generations_remaining > 0
-                ? 'bg-amber-50 text-amber-600 border border-amber-100'
+                ? 'bg-amber-50 text-amber-500 border border-amber-100'
                 : 'bg-stone-100 text-stone-400'
             }`}>
               {session.generations_remaining} try-on{session.generations_remaining !== 1 ? 's' : ''} left
@@ -116,11 +118,16 @@ export default function AnalysisPage() {
           <>
             {/* ── Results hero ────────────────────────────────────── */}
             {isComplete && faceShape && (
-              <div className="mt-6 mb-1">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-amber-500 mb-1">
+              <motion.div
+                className="mt-6 mb-1"
+                initial="hidden"
+                animate="show"
+                variants={stagger(0.08)}
+              >
+                <motion.p variants={fadeUpSm} className="text-[10px] font-bold uppercase tracking-widest text-amber-500 mb-1">
                   Your results
-                </p>
-                <div className="flex items-baseline gap-3 flex-wrap">
+                </motion.p>
+                <motion.div variants={fadeUp} className="flex items-baseline gap-3 flex-wrap">
                   <h1 className="text-3xl font-extrabold text-stone-900 tracking-tight">
                     {faceShapeLabel} face
                   </h1>
@@ -135,8 +142,8 @@ export default function AnalysisPage() {
                       </>
                     )}
                   </div>
-                </div>
-              </div>
+                </motion.div>
+              </motion.div>
             )}
 
             {/* ── Analysis card ───────────────────────────────────── */}

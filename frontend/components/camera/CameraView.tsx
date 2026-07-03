@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import OvalGuide from './OvalGuide'
 import { Camera, RotateCcw } from 'lucide-react'
 
@@ -209,25 +210,31 @@ export default function CameraView({ onCapture, onSwitchToUpload, onNoCameraAvai
         <div className="absolute inset-x-0 bottom-0 h-48 bg-gradient-to-t from-black/80 to-transparent pointer-events-none" />
 
         {/* Actions — safe area ensures buttons clear the iOS home indicator */}
-        <div className="absolute bottom-0 inset-x-0 flex flex-col items-center gap-3 px-6 z-10
-                        pb-[max(2rem,env(safe-area-inset-bottom))]">
-          <button
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="absolute bottom-0 inset-x-0 flex flex-col items-center gap-3 px-6 z-10
+                        pb-[max(2rem,env(safe-area-inset-bottom))]"
+        >
+          <motion.button
+            whileTap={!disabled ? { scale: 0.98 } : {}}
             onClick={() => onCapture(preview.blob)}
             disabled={disabled}
             className="w-full max-w-xs py-4 rounded-2xl bg-amber-400 text-neutral-950 font-bold text-base
-                       shadow-lg active:scale-[0.98] transition-transform disabled:opacity-50"
+                       shadow-lg transition-opacity disabled:opacity-50 min-h-[56px]"
           >
             {disabled ? 'Analysing…' : 'Analyse My Face'}
-          </button>
+          </motion.button>
           <button
             onClick={retake}
             disabled={disabled}
-            className="flex items-center gap-1.5 text-white/70 text-sm disabled:opacity-40"
+            className="flex items-center gap-1.5 text-white/70 text-sm disabled:opacity-40 py-2 px-3 min-h-[44px]"
           >
             <RotateCcw className="w-4 h-4" />
             Retake
           </button>
-        </div>
+        </motion.div>
 
         <canvas ref={canvasRef} className="hidden" />
       </div>
@@ -262,13 +269,21 @@ export default function CameraView({ onCapture, onSwitchToUpload, onNoCameraAvai
       </div>
 
       {/* Hold-still indicator */}
-      {isAligned && countdown > 0 && (
-        <div className="absolute bottom-36 left-0 right-0 flex justify-center z-10 pointer-events-none">
-          <div className="bg-green-900/60 border border-green-600/60 backdrop-blur-sm px-4 py-1.5 rounded-full">
-            <p className="text-green-400 text-sm font-medium">Hold still…</p>
-          </div>
-        </div>
-      )}
+      <AnimatePresence>
+        {isAligned && countdown > 0 && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            transition={{ duration: 0.2 }}
+            className="absolute bottom-36 left-0 right-0 flex justify-center z-10 pointer-events-none"
+          >
+            <div className="bg-green-900/60 border border-green-600/60 backdrop-blur-sm px-4 py-1.5 rounded-full">
+              <p className="text-green-400 text-sm font-medium">Hold still…</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Manual capture + upload link */}
       <div className="absolute bottom-0 left-0 right-0 flex flex-col items-center gap-3 z-10

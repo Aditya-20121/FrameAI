@@ -3,11 +3,13 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowLeft, ShieldCheck } from 'lucide-react'
 import CameraView from '@/components/camera/CameraView'
 import UploadFallback from '@/components/camera/UploadFallback'
 import QuoteLoader from '@/components/ui/QuoteLoader'
 import { uploadPhoto } from '@/lib/api'
+import { fadeUp, fadeUpSm, stagger } from '@/lib/motion'
 
 type Mode = 'camera' | 'upload'
 
@@ -64,24 +66,27 @@ export default function AnalysePage() {
         <div className="flex-1 flex flex-col px-5 py-8 max-w-md mx-auto w-full">
 
           {/* Icon + heading */}
-          <div>
-            <div className="w-14 h-14 bg-amber-50 border-2 border-amber-200 rounded-2xl flex items-center justify-center mb-5">
+          <motion.div initial="hidden" animate="show" variants={stagger(0.07)}>
+            <motion.div
+              variants={fadeUp}
+              className="w-14 h-14 bg-amber-50 border-2 border-amber-200 rounded-2xl flex items-center justify-center mb-5"
+            >
               <ShieldCheck className="w-7 h-7 text-amber-500" strokeWidth={1.8} />
-            </div>
+            </motion.div>
 
-            <p className="text-[10px] font-bold uppercase tracking-widest text-amber-500 mb-1">
+            <motion.p variants={fadeUpSm} className="text-[10px] font-bold uppercase tracking-widest text-amber-500 mb-1">
               Before we start
-            </p>
-            <h1 className="text-2xl font-extrabold text-stone-900 tracking-tight mb-2">
+            </motion.p>
+            <motion.h1 variants={fadeUp} className="text-2xl font-extrabold text-stone-900 tracking-tight mb-2 text-balance">
               Your data, explained simply
-            </h1>
-            <p className="text-stone-500 text-sm leading-relaxed mb-6">
+            </motion.h1>
+            <motion.p variants={fadeUp} className="text-stone-500 text-sm leading-relaxed mb-6">
               FrameAI uses your selfie to analyse your face shape and skin tone.
               Under Indian law, we need your explicit consent before processing biometric data.
-            </p>
+            </motion.p>
 
             {/* What we collect */}
-            <div className="space-y-2 mb-6">
+            <motion.div variants={fadeUp} className="space-y-2 mb-6">
               {[
                 {
                   icon: '📸',
@@ -107,18 +112,18 @@ export default function AnalysePage() {
                   </div>
                 </div>
               ))}
-            </div>
+            </motion.div>
 
             {/* What we DON'T do */}
-            <div className="bg-stone-50 border border-stone-100 rounded-xl px-4 py-3 mb-6">
+            <motion.div variants={fadeUp} className="bg-stone-50 border border-stone-100 rounded-xl px-4 py-3 mb-6">
               <p className="text-stone-500 text-xs leading-relaxed">
                 We <strong className="text-stone-700">do not</strong> share your photo with advertisers,
                 build a profile on you, or link your face to any identity. No account required.
               </p>
-            </div>
+            </motion.div>
 
             {/* Checkbox */}
-            <label className="flex items-start gap-3 cursor-pointer group">
+            <motion.label variants={fadeUp} className="flex items-start gap-3 cursor-pointer group">
               <div className="relative flex-shrink-0 mt-0.5">
                 <input
                   type="checkbox"
@@ -126,8 +131,10 @@ export default function AnalysePage() {
                   onChange={e => setTermsChecked(e.target.checked)}
                   className="sr-only"
                 />
-                <div
-                  className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all
+                <motion.div
+                  animate={{ scale: termsChecked ? [1, 1.15, 1] : 1 }}
+                  transition={{ duration: 0.25, ease: 'easeOut' }}
+                  className={`w-5 h-5 rounded-md border-2 flex items-center justify-center
                     ${termsChecked
                       ? 'bg-amber-500 border-amber-500'
                       : 'bg-white border-stone-300 group-hover:border-amber-400'
@@ -138,14 +145,14 @@ export default function AnalysePage() {
                       <path strokeLinecap="round" strokeLinejoin="round" d="M2 6l3 3 5-5" />
                     </svg>
                   )}
-                </div>
+                </motion.div>
               </div>
               <p className="text-stone-600 text-sm leading-relaxed">
                 I have read and agree to the{' '}
                 <Link
                   href="/terms"
                   target="_blank"
-                  className="text-amber-600 underline underline-offset-2 font-semibold"
+                  className="text-amber-500 underline underline-offset-2 font-semibold"
                   onClick={e => e.stopPropagation()}
                 >
                   Terms &amp; Conditions
@@ -154,33 +161,39 @@ export default function AnalysePage() {
                 <Link
                   href="/privacy"
                   target="_blank"
-                  className="text-amber-600 underline underline-offset-2 font-semibold"
+                  className="text-amber-500 underline underline-offset-2 font-semibold"
                   onClick={e => e.stopPropagation()}
                 >
                   Privacy Policy
                 </Link>
                 , and I consent to FrameAI processing my facial photograph for frame recommendations.
               </p>
-            </label>
-          </div>
+            </motion.label>
+          </motion.div>
 
           {/* CTA */}
-          <div className="pt-6 mt-auto">
-            <button
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.5 }}
+            className="pt-6 mt-auto"
+          >
+            <motion.button
+              whileTap={termsChecked ? { scale: 0.98 } : {}}
               disabled={!termsChecked}
               onClick={() => setConsentGiven(true)}
-              className={`w-full py-4 rounded-2xl font-bold text-base transition-all
+              className={`w-full py-4 rounded-2xl font-bold text-base transition-colors min-h-[56px]
                 ${termsChecked
-                  ? 'bg-amber-500 text-white shadow-lg shadow-amber-200 active:scale-[0.98] hover:bg-amber-400'
+                  ? 'bg-amber-500 text-white shadow-lg shadow-amber-200 hover:bg-amber-400'
                   : 'bg-stone-100 text-stone-400 cursor-not-allowed'
                 }`}
             >
               Continue to camera
-            </button>
+            </motion.button>
             <p className="text-center text-stone-400 text-xs mt-3">
               You must accept to proceed. Your consent is logged per session.
             </p>
-          </div>
+          </motion.div>
         </div>
       </main>
     )
@@ -231,20 +244,34 @@ export default function AnalysePage() {
         )}
       </div>
 
-      {uploading && (
-        <div className="absolute inset-0 bg-stone-900/92 flex flex-col items-center justify-center z-50 px-6">
-          <p className="text-white font-bold text-xl mb-1">Reading your face…</p>
-          <QuoteLoader category="analysis" estimatedSeconds={5} dark />
-        </div>
-      )}
+      <AnimatePresence>
+        {uploading && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-stone-900/92 flex flex-col items-center justify-center z-50 px-6"
+          >
+            <p className="text-white font-bold text-xl mb-1">Reading your face…</p>
+            <QuoteLoader category="analysis" estimatedSeconds={5} dark />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {error && (
-        <div className="absolute inset-x-4 bottom-6 p-4 bg-red-950/95 border border-red-700/60 rounded-2xl
-                        text-red-300 text-sm z-50 shadow-xl">
-          <p className="font-semibold mb-1">Upload failed</p>
-          <p>{error}</p>
-        </div>
-      )}
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            className="absolute inset-x-4 bottom-6 p-4 bg-red-950/95 border border-red-700/60 rounded-2xl
+                        text-red-300 text-sm z-50 shadow-xl"
+          >
+            <p className="font-semibold mb-1">Upload failed</p>
+            <p>{error}</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </main>
   )
 }

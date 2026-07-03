@@ -1,4 +1,8 @@
+'use client'
+
+import { motion } from 'framer-motion'
 import { Camera, Brain, Shirt } from 'lucide-react'
+import { fadeUp, fadeUpSm, stagger, viewportOnce } from '@/lib/motion'
 
 const STEPS = [
   {
@@ -25,23 +29,35 @@ export default function HowItWorks() {
   return (
     <section className="px-4 py-12 bg-white border-y border-stone-100">
 
-      <div className="text-center mb-10">
-        <p className="text-xs font-bold uppercase tracking-widest text-amber-600 mb-2">
+      <motion.div
+        className="text-center mb-10"
+        initial="hidden"
+        whileInView="show"
+        viewport={viewportOnce}
+        variants={stagger(0.08)}
+      >
+        <motion.p variants={fadeUpSm} className="text-xs font-bold uppercase tracking-widest text-amber-500 mb-2">
           How it works
-        </p>
-        <h2 className="text-2xl font-extrabold text-stone-900 tracking-tight">
+        </motion.p>
+        <motion.h2 variants={fadeUp} className="text-2xl font-extrabold text-stone-900 tracking-tight text-balance">
           From selfie to your{' '}
           <span className="font-display italic text-amber-500">perfect frame</span>
-        </h2>
-      </div>
+        </motion.h2>
+      </motion.div>
 
-      <div className="flex flex-col gap-0 max-w-2xl mx-auto">
+      <motion.div
+        className="flex flex-col gap-0 max-w-2xl mx-auto"
+        initial="hidden"
+        whileInView="show"
+        viewport={viewportOnce}
+        variants={stagger(0.15)}
+      >
         {STEPS.map(({ icon: Icon, step, title, desc }, i) => (
-          <div key={step} className="flex gap-5">
+          <motion.div key={step} variants={fadeUp} className="flex gap-5">
             {/* Icon + connector line */}
             <div className="flex flex-col items-center flex-shrink-0">
               <div className="relative w-11 h-11 rounded-2xl bg-amber-50 border-2 border-amber-200 flex items-center justify-center flex-shrink-0">
-                <Icon className="w-5 h-5 text-amber-500" strokeWidth={2} />
+                <Icon className="w-5 h-5 text-amber-500" strokeWidth={1.75} />
                 {/* Step number badge */}
                 <span className="absolute -top-2 -right-2 w-[18px] h-[18px] bg-amber-500 text-white text-[8px] font-black rounded-full flex items-center justify-center leading-none shadow-sm">
                   {i + 1}
@@ -57,9 +73,9 @@ export default function HowItWorks() {
               <h3 className="text-stone-900 font-bold text-base mb-1">{title}</h3>
               <p className="text-stone-500 text-sm leading-relaxed">{desc}</p>
             </div>
-          </div>
+          </motion.div>
         ))}
-      </div>
+      </motion.div>
     </section>
   )
 }

@@ -1,8 +1,10 @@
 'use client'
 
+import { motion } from 'framer-motion'
 import type { AnalysisResponse, Jawline, Cheekbones, EyeSet, SkinDepth } from '@/lib/types'
 import { deriveStyleGuide } from '@/lib/styleGuide'
 import QuoteLoader from '@/components/ui/QuoteLoader'
+import { fadeUp } from '@/lib/motion'
 
 // ── Display label maps ────────────────────────────────────────────────────────
 
@@ -112,7 +114,12 @@ export default function AnalysisCard({ analysis }: Props) {
   const hasFeatures = jawline || cheekbones || eye_set
 
   return (
-    <div className="mt-6 bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden">
+    <motion.div
+      initial="hidden"
+      animate="show"
+      variants={fadeUp}
+      className="mt-6 bg-white rounded-2xl border border-stone-100 shadow-sm overflow-hidden"
+    >
       {/* Accent bar */}
       <div className="h-1 bg-gradient-to-r from-amber-400 to-amber-200" />
 
@@ -164,7 +171,7 @@ export default function AnalysisCard({ analysis }: Props) {
                 </p>
               )}
               {guide.styleNote && (
-                <p className="text-[10px] text-amber-600 font-medium mt-1.5 leading-snug">
+                <p className="text-[10px] text-amber-500 font-medium mt-1.5 leading-snug">
                   ↳ {guide.styleNote}
                 </p>
               )}
@@ -282,7 +289,7 @@ export default function AnalysisCard({ analysis }: Props) {
                     {SIZE_FULL[size_band ?? 'standard']}
                   </p>
                   {guide.sizeNote && (
-                    <p className="text-[10px] text-amber-600 font-medium mt-1 leading-snug">
+                    <p className="text-[10px] text-amber-500 font-medium mt-1 leading-snug">
                       ↳ {guide.sizeNote}
                     </p>
                   )}
@@ -293,7 +300,7 @@ export default function AnalysisCard({ analysis }: Props) {
         )}
 
       </div>
-    </div>
+    </motion.div>
   )
 }
 

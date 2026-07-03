@@ -1,10 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { motion } from 'framer-motion'
 import { getCatalogue } from '@/lib/api'
 import type { CatalogueFrame } from '@/lib/types'
 import FrameCard from './FrameCard'
 import { ChevronRight } from 'lucide-react'
+import { fadeUp, stagger } from '@/lib/motion'
 
 const STYLE_TABS = [
   { label: 'All',       value: '' },
@@ -77,7 +79,7 @@ export default function TryOnCatalogueSection({ jobId, generationsRemaining, onG
           </h2>
           <span className={`text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0 ${
             remaining > 0
-              ? 'bg-amber-50 text-amber-600 border border-amber-100'
+              ? 'bg-amber-50 text-amber-500 border border-amber-100'
               : 'bg-stone-100 text-stone-400'
           }`}>
             {remaining} try-on{remaining !== 1 ? 's' : ''} left
@@ -87,7 +89,7 @@ export default function TryOnCatalogueSection({ jobId, generationsRemaining, onG
 
       {remaining === 0 && (
         <div className="mb-5 p-4 bg-amber-50 border border-amber-100 rounded-2xl">
-          <p className="text-amber-800 text-sm font-semibold">You've used all 3 free try-ons.</p>
+          <p className="text-amber-700 text-sm font-semibold">You've used all 3 free try-ons.</p>
           <p className="text-amber-700/70 text-xs mt-0.5 leading-relaxed">
             You can still browse and buy any frame using the link on each card.
           </p>
@@ -138,31 +140,38 @@ export default function TryOnCatalogueSection({ jobId, generationsRemaining, onG
           <p className="text-stone-400 text-sm">No frames found for this style.</p>
           <button
             onClick={() => setActiveStyle('')}
-            className="mt-3 text-amber-600 text-sm font-medium underline underline-offset-2"
+            className="mt-3 text-amber-500 text-sm font-medium underline underline-offset-2"
           >
             Show all frames
           </button>
         </div>
       ) : (
         <>
-          <div className="space-y-4">
+          <motion.div
+            key={activeStyle}
+            className="space-y-4"
+            initial="hidden"
+            animate="show"
+            variants={stagger(0.06)}
+          >
             {frames.map(frame => (
-              <FrameCard
-                key={frame.frame_id}
-                frame={frame}
-                jobId={jobId}
-                generationsRemaining={remaining}
-                onComplete={handleComplete}
-              />
+              <motion.div key={frame.frame_id} variants={fadeUp}>
+                <FrameCard
+                  frame={frame}
+                  jobId={jobId}
+                  generationsRemaining={remaining}
+                  onComplete={handleComplete}
+                />
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
 
           {hasMore && (
             <button
               onClick={() => fetchFrames(activeStyle, offset, false)}
               disabled={loadingMore}
               className="mt-6 w-full py-3.5 border border-stone-200 rounded-xl text-stone-600 text-sm font-medium
-                         flex items-center justify-center gap-2 active:bg-stone-100 transition-colors disabled:opacity-50 bg-white"
+                         flex items-center justify-center gap-2 active:bg-stone-100 transition-colors disabled:opacity-50 bg-white min-h-[48px]"
             >
               {loadingMore ? (
                 <><div className="w-4 h-4 border-2 border-stone-300 border-t-stone-600 rounded-full animate-spin" /> Loading…</>
