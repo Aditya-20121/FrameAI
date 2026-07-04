@@ -151,10 +151,15 @@ export default function CameraView({ onCapture, onSwitchToUpload, onNoCameraAvai
     capturingRef.current = true
     canvas.width  = video.videoWidth
     canvas.height = video.videoHeight
-    // Draw raw (no transform) — correct orientation for AI analysis.
-    // The preview <img> uses CSS scaleX(-1) to show it mirrored, matching the viewfinder.
+    // Flip horizontally so the captured pixels match the mirrored viewfinder the
+    // user actually saw — otherwise the uploaded photo (and everything derived
+    // from it: face analysis, the AI try-on reference image) comes out as a
+    // true (unmirrored) capture, which looks wrong to people used to their
+    // mirror image (asymmetric features, hair part, etc. end up reversed).
     const ctx = canvas.getContext('2d')
     if (!ctx) { capturingRef.current = false; return }
+    ctx.translate(canvas.width, 0)
+    ctx.scale(-1, 1)
     ctx.drawImage(video, 0, 0)
 
     const finish = (blob: Blob | null) => {
@@ -197,13 +202,12 @@ export default function CameraView({ onCapture, onSwitchToUpload, onNoCameraAvai
   if (preview) {
     return (
       <div className="flex-1 relative flex flex-col overflow-hidden">
-        {/* Captured photo — mirrored with CSS so it matches what the user saw in the viewfinder */}
+        {/* Captured photo — already mirrored at capture time, no CSS flip needed */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={preview.url}
           alt="Your photo"
           className="w-full h-full object-cover"
-          style={{ transform: 'scaleX(-1)' }}
         />
 
         {/* Dark gradient at bottom */}
