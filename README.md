@@ -8,6 +8,25 @@ FrameAI analyses your face shape and skin undertone from a single photo, recomme
 
 ---
 
+## Screenshots
+
+<table>
+  <tr>
+    <td width="25%"><img src="docs/screenshots/01-homepage.png" alt="Homepage hero" /><br /><sub><b>Homepage</b> — the pitch and entry point</sub></td>
+    <td width="25%"><img src="docs/screenshots/02-camera-capture.png" alt="Camera capture" /><br /><sub><b>Selfie capture</b> — in-browser camera or upload</sub></td>
+    <td width="25%"><img src="docs/screenshots/03-face-analysis.png" alt="Face shape analysis" /><br /><sub><b>Face analysis</b> — shape, confidence, best styles</sub></td>
+    <td width="25%"><img src="docs/screenshots/04-recommendations.png" alt="Skin tone and frame size recommendations" /><br /><sub><b>Recommendations</b> — undertone, colours, fit</sub></td>
+  </tr>
+  <tr>
+    <td width="25%"><img src="docs/screenshots/05-catalogue.png" alt="Frame catalogue" /><br /><sub><b>Catalogue</b> — browse and filter by style</sub></td>
+    <td width="25%"><img src="docs/screenshots/06-tryon-square.png" alt="AI try-on, square frame" /><br /><sub><b>AI try-on</b> — square frame, photorealistic</sub></td>
+    <td width="25%"><img src="docs/screenshots/07-tryon-wayfarer.png" alt="AI try-on, wayfarer frame" /><br /><sub><b>AI try-on</b> — wayfarer frame</sub></td>
+    <td width="25%"><img src="docs/screenshots/08-tryon-cateye.png" alt="AI try-on, cat-eye frame" /><br /><sub><b>AI try-on</b> — cat-eye frame</sub></td>
+  </tr>
+</table>
+
+---
+
 ## The problem
 
 Buying glasses online is a guessing game. AR try-on tools look plasticky and unreal, and nothing tells you *why* a frame does or doesn't suit you. FrameAI replaces the guesswork with an actual analysis, then shows you a realistic result instead of a cartoon overlay.
