@@ -57,9 +57,11 @@ async def upload_photo(
             detail={"error": "file_too_large", "message": "Photo must be under 10 MB."},
         )
 
-    # Stage 1: Validate image and face count (fast, local)
+    # Stage 1: Validate image and face count (fast, local). Also downscales —
+    # resized_bytes (not the original, potentially 12MP+ phone photo) is what
+    # gets used for the rest of this request to stay within Render's 512MB cap.
     try:
-        bgr = face_analysis.validate_image(image_bytes)
+        bgr, resized_bytes = face_analysis.validate_image(image_bytes)
         face_analysis.validate_faces(bgr)
     except ValueError as exc:
         code = str(exc)
@@ -68,14 +70,14 @@ async def upload_photo(
             detail={"error": code, "message": _ERROR_MESSAGES.get(code, "Photo validation failed.")},
         )
 
-    # Create job + store photo
+    # Create job + store the ORIGINAL full-resolution photo (R2 storage, no decode needed)
     job_id = db.create_job(session_token, photo_r2_key="pending")
     r2_key = storage.upload_photo(job_id, image_bytes, photo.content_type or "image/jpeg")
     db.update_job_r2_key(job_id, r2_key)
 
-    # Stage 2: Full analysis (MediaPipe landmarks + Qwen3 VL Flash)
+    # Stage 2: Full analysis (Qwen3 VL Flash) — runs on the downscaled copy
     try:
-        result = await face_analysis.run_face_analysis(image_bytes)
+        result = await face_analysis.run_face_analysis(resized_bytes)
         db.update_job_analysis(
             job_id,
             face_shape=result.face_shape,

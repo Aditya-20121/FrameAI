@@ -108,10 +108,19 @@ class AnalysisResult:
 # ── Image + face validation ────────────────────────────────────────────────────
 
 MIN_RESOLUTION  = 512
+MAX_DIMENSION   = 1600  # cap the longest side before any decode/CV work
 MIN_FACE_FRACTION = 0.25
 
 
-def validate_image(image_bytes: bytes) -> np.ndarray:
+def validate_image(image_bytes: bytes) -> tuple[np.ndarray, bytes]:
+    """
+    Returns (bgr_array_for_local_cv, resized_jpeg_bytes_for_the_vision_api).
+    Phone photos are routinely 12MP+; decoding and running float64 Laplacian
+    plus base64-encoding at full resolution is what was blowing past Render's
+    512MB limit. Downscaling to MAX_DIMENSION first is plenty for both face
+    detection and the Gemini vision call — the original bytes (unresized)
+    are still what gets stored in R2, this only affects in-request processing.
+    """
     try:
         pil = Image.open(io.BytesIO(image_bytes)).convert("RGB")
     except Exception:
@@ -121,12 +130,20 @@ def validate_image(image_bytes: bytes) -> np.ndarray:
     if w < MIN_RESOLUTION or h < MIN_RESOLUTION:
         raise ValueError("resolution_too_low")
 
+    if max(w, h) > MAX_DIMENSION:
+        scale = MAX_DIMENSION / max(w, h)
+        pil = pil.resize((round(w * scale), round(h * scale)), Image.LANCZOS)
+
+    buf = io.BytesIO()
+    pil.save(buf, format="JPEG", quality=90)
+    resized_bytes = buf.getvalue()
+
     bgr = cv2.cvtColor(np.array(pil), cv2.COLOR_RGB2BGR)
     gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
     if cv2.Laplacian(gray, cv2.CV_64F).var() < 60:
         raise ValueError("image_too_blurry")
 
-    return bgr
+    return bgr, resized_bytes
 
 
 def validate_faces(bgr: np.ndarray) -> None:
