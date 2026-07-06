@@ -89,7 +89,7 @@ export default function TryOnCatalogueSection({ jobId, generationsRemaining, onG
 
       {remaining === 0 && (
         <div className="mb-5 p-4 bg-amber-50 border border-amber-100 rounded-2xl">
-          <p className="text-amber-700 text-sm font-semibold">You've used all 3 free try-ons.</p>
+          <p className="text-amber-700 text-sm font-semibold">AI try-on is paused for now.</p>
           <p className="text-amber-700/70 text-xs mt-0.5 leading-relaxed">
             You can still browse and buy any frame using the link on each card.
           </p>

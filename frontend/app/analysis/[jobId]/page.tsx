@@ -153,7 +153,7 @@ export default function AnalysisPage() {
             {isComplete && (
               <TryOnCatalogueSection
                 jobId={jobId}
-                generationsRemaining={session?.generations_remaining ?? 3}
+                generationsRemaining={session?.generations_remaining ?? 0}
                 onGenerationComplete={handleGenerationComplete}
               />
             )}

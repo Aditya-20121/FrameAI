@@ -30,7 +30,7 @@ from services import storage, generation as gen_svc
 log = logging.getLogger(__name__)
 router = APIRouter()
 
-GENERATION_LIMIT = 3
+GENERATION_LIMIT = 0  # try-on generation disabled — analysis-only mode until credits are replenished
 _IS_PROD    = os.getenv("ENVIRONMENT", "development").lower() == "production"
 _USE_CELERY = os.getenv("USE_CELERY", "false").lower() == "true"
 

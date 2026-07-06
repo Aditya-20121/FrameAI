@@ -101,7 +101,7 @@ export default function AnalysePage() {
                 {
                   icon: '✨',
                   title: 'Try-on images',
-                  detail: 'Generated only when you click "Try this on". Max 3 per session.',
+                  detail: 'AI try-on generation is temporarily paused — face analysis and recommendations are fully available.',
                 },
               ].map(({ icon, title, detail }) => (
                 <div key={title} className="flex gap-3 bg-white border border-stone-100 rounded-xl p-3.5">

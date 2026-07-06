@@ -64,7 +64,7 @@ async def get_session_status(
     used = session["generations_used"]
     return SessionStatus(
         generations_used=used,
-        generations_remaining=max(0, 3 - used),
+        generations_remaining=max(0, 0 - used),
     )
 
 

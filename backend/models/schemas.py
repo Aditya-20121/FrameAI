@@ -105,4 +105,4 @@ class GenerationStatus(BaseModel):
 class SessionStatus(BaseModel):
     generations_used: int
     generations_remaining: int
-    limit: int = 3
+    limit: int = 0
