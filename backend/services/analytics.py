@@ -33,4 +33,7 @@ async def capture(distinct_id: str, event: str, properties: dict | None = None) 
     try:
         await asyncio.to_thread(db.insert_event, event, distinct_id, properties or {})
     except Exception:
-        log.error("analytics_capture_failed", event=event)
+        # structlog reserves the "event" kwarg for the log message itself —
+        # passing our own `event=` here collided with it and raised instead
+        # of logging, defeating the whole point of this try/except.
+        log.error("analytics_capture_failed", analytics_event=event)
