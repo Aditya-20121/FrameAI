@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+      - name: Install backend dependencies
+        run: pip install -r backend/requirements.txt
+      - name: Run backend test suite with coverage
+        working-directory: backend
+        run: pytest tests/ --cov=. --cov-report=term-missing
+
+  scraper-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - name: Install scraper pipeline test dependencies
+        # Deliberately NOT the full scraper/requirements.txt (torch/transformers/
+        # playwright — CLIP annotation + browser scraping deps): the pipeline
+        # unit tests only exercise normalise/annotate/dedupe, which need pillow
+        # + imagehash. Installing the full scraper stack here would add minutes
+        # of CI time for dependencies these tests never touch.
+        run: pip install pillow imagehash python-dotenv pytest
+      - name: Run scraper pipeline test suite
+        working-directory: scraper
+        run: pytest tests/ -v
+
+  deploy:
+    needs: [backend-tests, scraper-tests]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render deploy
+        run: |
+          if [ -z "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" ]; then
+            echo "RENDER_DEPLOY_HOOK_URL secret is not set — skipping deploy trigger."
+            echo "Add it in GitHub repo Settings > Secrets > Actions (get the URL from Render dashboard > frameai-backend > Settings > Deploy Hook)."
+            exit 1
+          fi
+          curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"

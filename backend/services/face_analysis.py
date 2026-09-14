@@ -11,14 +11,19 @@ import base64
 import io
 import json
 import re
+import time
 from dataclasses import dataclass
 
 import cv2
 import httpx
 import numpy as np
+import structlog
 from PIL import Image
 
 from config import settings
+from services import analytics
+
+log = structlog.get_logger(__name__)
 
 GEMINI_ENDPOINT = "https://api.segmind.com/v1/gemini-2.5-flash-lite"
 
@@ -170,7 +175,7 @@ def _image_mime(image_bytes: bytes) -> str:
     return "image/webp"
 
 
-async def _call_gemini_vision(image_bytes: bytes) -> dict:
+async def _call_gemini_vision(image_bytes: bytes, distinct_id: str = "unknown") -> dict:
     mime   = _image_mime(image_bytes)
     img_b64 = base64.b64encode(image_bytes).decode()
 
@@ -189,9 +194,17 @@ async def _call_gemini_vision(image_bytes: bytes) -> dict:
     }
     headers = {"x-api-key": settings.segmind_api_key, "Content-Type": "application/json"}
 
-    async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.post(GEMINI_ENDPOINT, json=payload, headers=headers)
-        resp.raise_for_status()
+    start = time.perf_counter()
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(GEMINI_ENDPOINT, json=payload, headers=headers)
+            resp.raise_for_status()
+    except Exception:
+        duration_ms = round((time.perf_counter() - start) * 1000, 1)
+        log.error("face_analysis_call_failed", duration_ms=duration_ms)
+        await analytics.capture(distinct_id, "face_analysis_failed", {"duration_ms": duration_ms})
+        raise
+    duration_ms = round((time.perf_counter() - start) * 1000, 1)
 
     # Gemini response: candidates[0].content.parts[0].text
     text = resp.json()["candidates"][0]["content"]["parts"][0]["text"]
@@ -200,7 +213,15 @@ async def _call_gemini_vision(image_bytes: bytes) -> dict:
     text = re.sub(r"```(?:json)?\s*|\s*```", "", text).strip()
     match = re.search(r"\{.*\}", text, re.DOTALL)
     if not match:
+        await analytics.capture(distinct_id, "face_analysis_failed", {"duration_ms": duration_ms})
         raise ValueError(f"No JSON in Gemini response: {text[:200]}")
+
+    log.info("face_analysis_call_completed", duration_ms=duration_ms, cost_usd=analytics.COST_FACE_ANALYSIS_USD)
+    await analytics.capture(
+        distinct_id,
+        "face_analysis_completed",
+        {"duration_ms": duration_ms, "cost_usd": analytics.COST_FACE_ANALYSIS_USD},
+    )
     return json.loads(match.group())
 
 
@@ -232,7 +253,7 @@ def _extract_primary_shape(label: str) -> str:
 
 # ── Top-level entry point ──────────────────────────────────────────────────────
 
-async def run_face_analysis(image_bytes: bytes) -> AnalysisResult:
+async def run_face_analysis(image_bytes: bytes, distinct_id: str = "unknown") -> AnalysisResult:
     """
     Full pipeline:
     Stage 1 — local image decode (resolution + blur check already done by validate_image)
@@ -240,7 +261,7 @@ async def run_face_analysis(image_bytes: bytes) -> AnalysisResult:
 
     Raises on failure so the caller can return a proper 500 to the client.
     """
-    q = await _call_gemini_vision(image_bytes)
+    q = await _call_gemini_vision(image_bytes, distinct_id)
 
     # face_shape is the nuanced display label ("Oval (leaning towards Square)")
     # face_shape_primary is the strict enum for DB/logic ("oval")

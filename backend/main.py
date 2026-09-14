@@ -1,5 +1,7 @@
 import logging
+import time
 
+import structlog
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -7,11 +9,14 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from logging_config import configure_logging
 from limiter import limiter
 from api import upload, analysis, recommendations, generate, catalogue
 from config import settings
+from services import analytics
 
-log = logging.getLogger(__name__)
+configure_logging()
+log = structlog.get_logger(__name__)
 
 # ── App ───────────────────────────────────────────────────────────────────────
 app = FastAPI(
@@ -35,6 +40,48 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         return response
 
 app.add_middleware(SecurityHeadersMiddleware)
+
+
+# ── Request logging + analytics ─────────────────────────────────────────────────
+class RequestLoggingMiddleware(BaseHTTPMiddleware):
+    """Logs every request as structured JSON and mirrors it to PostHog as
+    `api_request` (volume, latency for P50/P95, error rate via status_code)."""
+
+    async def dispatch(self, request: Request, call_next):
+        start = time.perf_counter()
+        status_code = 500
+        try:
+            response = await call_next(request)
+            status_code = response.status_code
+            return response
+        finally:
+            duration_ms = round((time.perf_counter() - start) * 1000, 1)
+            distinct_id = (
+                request.headers.get("X-Session-Token")
+                or request.cookies.get("_frameai_session")
+                or (request.client.host if request.client else "unknown")
+            )
+            log.info(
+                "http_request",
+                method=request.method,
+                path=request.url.path,
+                status_code=status_code,
+                duration_ms=duration_ms,
+            )
+            await analytics.capture(
+                distinct_id=distinct_id,
+                event="api_request",
+                properties={
+                    "method": request.method,
+                    "path": request.url.path,
+                    "status_code": status_code,
+                    "duration_ms": duration_ms,
+                    "is_error": status_code >= 400,
+                },
+            )
+
+
+app.add_middleware(RequestLoggingMiddleware)
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
 app.add_middleware(

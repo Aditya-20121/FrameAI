@@ -77,7 +77,7 @@ async def upload_photo(
 
     # Stage 2: Full analysis (Qwen3 VL Flash) — runs on the downscaled copy
     try:
-        result = await face_analysis.run_face_analysis(resized_bytes)
+        result = await face_analysis.run_face_analysis(resized_bytes, distinct_id=session_token)
         db.update_job_analysis(
             job_id,
             face_shape=result.face_shape,

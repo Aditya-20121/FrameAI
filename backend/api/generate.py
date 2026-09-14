@@ -44,7 +44,7 @@ async def _run_generation_bg(task_id: str, job_id: str, frame_id: str, session_t
             log.error("Frame %s not found for task %s", frame_id, task_id)
             db.update_generation_task(task_id, status="failed")
             return
-        r2_key = await gen_svc.generate_try_on(job_id, frame, task_id)
+        r2_key = await gen_svc.generate_try_on(job_id, frame, task_id, distinct_id=session_token)
         from config import settings as _settings
         image_url = f"{_settings.r2_public_domain}/{r2_key}"
         db.update_generation_task(
