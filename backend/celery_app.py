@@ -14,6 +14,9 @@ from celery import Celery
 from celery.schedules import crontab
 
 from config import settings
+from logging_config import configure_logging
+
+configure_logging()
 
 celery_app = Celery(
     "frameai",

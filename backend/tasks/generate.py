@@ -42,7 +42,7 @@ def generate_try_on(
             db.update_generation_task(task_id, status="failed")
             return
 
-        r2_key = asyncio.run(gen_svc.generate_try_on(job_id, frame, task_id))
+        r2_key = asyncio.run(gen_svc.generate_try_on(job_id, frame, task_id, distinct_id=session_token))
         db.update_generation_task(task_id, status="complete", image_r2_key=r2_key)
         db.increment_generations(session_token)
 

@@ -241,3 +241,13 @@ def get_distinct_styles() -> list[str]:
         .execute()
     )
     return sorted({row["style"] for row in (result.data or []) if row.get("style")})
+
+
+# ── Events (usage analytics — see services/analytics.py) ───────────────────────
+
+def insert_event(event: str, distinct_id: str, properties: dict) -> None:
+    _client().table("events").insert({
+        "event": event,
+        "distinct_id": distinct_id,
+        "properties": properties,
+    }).execute()

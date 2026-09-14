@@ -12,12 +12,16 @@ Pipeline:
 """
 import base64
 import io
+import time
 
 import httpx
+import structlog
 from PIL import Image
 
 from config import settings
-from services import storage
+from services import storage, analytics
+
+log = structlog.get_logger(__name__)
 
 SEGMIND_ENDPOINT = "https://api.segmind.com/v1/nano-banana-2-lite"
 
@@ -37,7 +41,7 @@ def build_generation_prompt(frame: dict) -> str:
     )
 
 
-async def generate_try_on(job_id: str, frame: dict, task_id: str) -> str:
+async def generate_try_on(job_id: str, frame: dict, task_id: str, distinct_id: str = "unknown") -> str:
     """
     Full generation pipeline.
     Returns the R2 key of the generated portrait.
@@ -47,7 +51,22 @@ async def generate_try_on(job_id: str, frame: dict, task_id: str) -> str:
     frame_url = _frame_presigned_url(frame["product_image_url"])
     prompt    = build_generation_prompt(frame)
 
-    portrait_bytes = await _call_segmind(photo_url, frame_url, prompt)
+    start = time.perf_counter()
+    try:
+        portrait_bytes = await _call_segmind(photo_url, frame_url, prompt)
+    except Exception:
+        duration_ms = round((time.perf_counter() - start) * 1000, 1)
+        log.error("generation_call_failed", task_id=task_id, duration_ms=duration_ms)
+        await analytics.capture(distinct_id, "generation_failed", {"task_id": task_id, "duration_ms": duration_ms})
+        raise
+
+    duration_ms = round((time.perf_counter() - start) * 1000, 1)
+    log.info("generation_call_completed", task_id=task_id, duration_ms=duration_ms, cost_usd=analytics.COST_GENERATION_USD)
+    await analytics.capture(
+        distinct_id,
+        "generation_completed",
+        {"task_id": task_id, "duration_ms": duration_ms, "cost_usd": analytics.COST_GENERATION_USD},
+    )
     return storage.upload_generated_image(task_id, portrait_bytes)
 
 

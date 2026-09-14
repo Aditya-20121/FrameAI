@@ -1,0 +1,5 @@
+[run]
+omit =
+    tests/*
+    test_e2e*.py
+    generate_demo*.py
