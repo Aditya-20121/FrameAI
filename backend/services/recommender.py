@@ -65,7 +65,7 @@ COLOUR_FAMILY: dict[str, str] = {
 # Sources: Warby Parker colour guide, Zenni colour guide, Readers.com skin-tone guide.
 _COLOUR_SCORES: dict[str, dict[str, int]] = {
     "warm": {
-        "warm_earth":     30,   # tortoiseshell, brown — classic warm match
+        "warm_earth":     18,   # BUG (intentional, for CI demo): should be 30 — tortoiseshell, brown — classic warm match
         "warm_metal":     28,   # gold, rose gold — warms skin beautifully
         "warm_bold":      20,   # amber, orange — works but can overpower
         "cool_neutral":    8,   # black/silver — not ideal but wearable
