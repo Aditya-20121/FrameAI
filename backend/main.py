@@ -101,5 +101,6 @@ app.include_router(catalogue.router)
 
 
 @app.get("/health")
+@app.head("/health")  # UptimeRobot's HTTP(s) monitor checks via HEAD — GET-only 405'd it
 async def health():
     return {"status": "ok", "version": "1.0.0"}
