@@ -3,15 +3,36 @@ Supabase client wrapper — all DB operations go through these functions.
 Uses the service role key so calls are not subject to row-level security.
 """
 import secrets
+from functools import lru_cache
 from uuid import UUID
 from datetime import datetime, timezone, timedelta
 
-from supabase import create_client, Client
+import httpx
+from supabase import create_client, Client, ClientOptions
 from config import settings
 
 
+@lru_cache
 def _client() -> Client:
-    return create_client(settings.supabase_url, settings.supabase_service_key)
+    # Cached: a fresh create_client() per call meant a new underlying httpx
+    # client (no TCP/TLS connection reuse) on every single query — see
+    # PRODUCTION_NOTES.md for the load test that measured this.
+    #
+    # http2=False is deliberate: this client is shared across many
+    # asyncio.to_thread worker threads at once, and httpx/httpcore's HTTP/2
+    # multiplexing over one shared connection wasn't safe under that
+    # concurrent multi-threaded access pattern (load test surfaced real
+    # "stream" ConnectionResetErrors). HTTP/1.1 gives each concurrent caller
+    # its own pooled connection instead of sharing multiplexed streams.
+    httpx_client = httpx.Client(
+        http2=False,
+        limits=httpx.Limits(max_connections=32, max_keepalive_connections=32),
+    )
+    return create_client(
+        settings.supabase_url,
+        settings.supabase_service_key,
+        options=ClientOptions(httpx_client=httpx_client),
+    )
 
 
 # ── Sessions ──────────────────────────────────────────────────────────────────
