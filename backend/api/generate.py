@@ -10,6 +10,7 @@ Worker strategy:
   - Production (ENVIRONMENT=production): Celery + Redis (Upstash)
   - Development (default):               FastAPI BackgroundTasks (no worker needed)
 """
+import asyncio
 import logging
 import os
 from uuid import UUID
@@ -30,37 +31,49 @@ from services import storage, generation as gen_svc
 log = logging.getLogger(__name__)
 router = APIRouter()
 
-GENERATION_LIMIT = 0  # try-on generation disabled — analysis-only mode until credits are replenished
+# try-on generation disabled — analysis-only mode until credits are replenished.
+# GENERATION_LIMIT_OVERRIDE / GENERATE_RATE_LIMIT_OVERRIDE exist solely for local
+# load testing (see backend/loadtest/) — unset in every real deployment, so
+# production behaviour is unchanged.
+GENERATION_LIMIT = int(os.getenv("GENERATION_LIMIT_OVERRIDE", "0"))
+_GENERATE_RATE_LIMIT = os.getenv("GENERATE_RATE_LIMIT_OVERRIDE", "10/hour")
 _IS_PROD    = os.getenv("ENVIRONMENT", "development").lower() == "production"
 _USE_CELERY = os.getenv("USE_CELERY", "false").lower() == "true"
 
 
 async def _run_generation_bg(task_id: str, job_id: str, frame_id: str, session_token: str) -> None:
-    """Async background function — awaited by FastAPI BackgroundTasks (dev mode)."""
-    db.update_generation_task(task_id, status="processing")
+    """Async background function — awaited by FastAPI BackgroundTasks (dev mode).
+
+    Every db.client call is blocking (sync Supabase client) — wrapped in
+    asyncio.to_thread so it doesn't stall the event loop for other requests
+    being served concurrently. See PRODUCTION_NOTES.md for the load test that
+    found this serializing all concurrent /generate traffic.
+    """
+    await asyncio.to_thread(db.update_generation_task, task_id, status="processing")
     try:
-        frame = db.get_frame(frame_id)
+        frame = await asyncio.to_thread(db.get_frame, frame_id)
         if not frame:
             log.error("Frame %s not found for task %s", frame_id, task_id)
-            db.update_generation_task(task_id, status="failed")
+            await asyncio.to_thread(db.update_generation_task, task_id, status="failed")
             return
         r2_key = await gen_svc.generate_try_on(job_id, frame, task_id, distinct_id=session_token)
         from config import settings as _settings
         image_url = f"{_settings.r2_public_domain}/{r2_key}"
-        db.update_generation_task(
+        await asyncio.to_thread(
+            db.update_generation_task,
             task_id,
             status="complete",
             image_r2_key=r2_key,
             generated_image_url=image_url,
         )
-        db.increment_generations(session_token)
+        await asyncio.to_thread(db.increment_generations, session_token)
     except Exception as exc:
         log.exception("Generation failed for task %s: %s", task_id, exc)
-        db.update_generation_task(task_id, status="failed")
+        await asyncio.to_thread(db.update_generation_task, task_id, status="failed")
 
 
 @router.post("/generate", response_model=GenerateResponse)
-@limiter.limit("10/hour")
+@limiter.limit(_GENERATE_RATE_LIMIT)
 async def request_generation(
     request: Request,
     body: GenerateRequest,
@@ -68,7 +81,7 @@ async def request_generation(
     session_token: str = Depends(require_session),
 ):
     # ── Guard: check generation limit ──────────────────────────────────────────
-    session = db.get_session(session_token)
+    session = await asyncio.to_thread(db.get_session, session_token)
     used = session["generations_used"]
     if used >= GENERATION_LIMIT:
         raise HTTPException(
@@ -82,16 +95,16 @@ async def request_generation(
         )
 
     # ── Validate job + frame belong to this session ────────────────────────────
-    job = db.get_job(str(body.job_id))
+    job = await asyncio.to_thread(db.get_job, str(body.job_id))
     if not job or job["session_token"] != session_token:
         raise HTTPException(status_code=403, detail="Invalid job.")
 
-    if not db.get_frame(str(body.frame_id)):
+    if not await asyncio.to_thread(db.get_frame, str(body.frame_id)):
         raise HTTPException(status_code=404, detail="Frame not found.")
 
     # ── Create generation task row, dispatch to worker ────────────────────────
-    task_id = db.create_generation_task(
-        str(body.job_id), str(body.frame_id), session_token
+    task_id = await asyncio.to_thread(
+        db.create_generation_task, str(body.job_id), str(body.frame_id), session_token
     )
 
     if _USE_CELERY:
@@ -114,15 +127,16 @@ async def get_generation_status(
     task_id: UUID,
     session_token: str = Depends(require_session),
 ):
-    task = db.get_generation_task(str(task_id))
+    task = await asyncio.to_thread(db.get_generation_task, str(task_id))
     if not task or task["session_token"] != session_token:
         raise HTTPException(status_code=404, detail="Task not found.")
 
     if task["status"] == "complete":
+        image_url = await asyncio.to_thread(storage.get_presigned_url, task["image_r2_key"])
         return GenerationStatus(
             task_id=task_id,
             status="complete",
-            image_url=storage.get_presigned_url(task["image_r2_key"]),
+            image_url=image_url,
             expires_at=task["expires_at"],
         )
 
